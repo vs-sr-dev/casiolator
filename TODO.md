@@ -21,7 +21,7 @@
     SH7020/21 hardware manual (both in refs/, not in git)
   - VDP from kasami's Megadoc: tilemaps, bitmaps (colour latch, flash fill), objects,
     screens A/B, the 16 priority orders, blend modes
-  - all 12 cartridges start and respond (Chakrakun from D:\Homebrew2\CL\games); battery
+  - all 12 cartridges start and respond (Chakrakun from the 2023 set); battery
     saves in saves/; the BIOS (hd6437021.lsi302, CRC 8c57ff9f) found beside the exe or
     the game, else asked once; 7.5x real time
   - user-tested in the window: Loopy Town's cursor fixed (OBJ format bit also on OBJ1)
@@ -47,7 +47,7 @@
 - A program change ends the channel's notes (the BIOS changes tracks that way; user found
   notes hanging across screens).
 - Test cartridge tests/loopy_soundtest (all programs, range, bend, sustain, velocity,
-  polyphony, volumes); recorded in the SR2 MAME fork as a black box
+  polyphony, volumes); recorded in a MAME fork with Loopy sound as a black box
   (byte-swapped cartridge; retail games are silent there: its SCI1 does not take DMA).
 
 ### Session 3 (2026-11-01)
@@ -62,9 +62,9 @@
 
 ## Rules for the Loopy (user, 2026-11-01)
 
-Clean room, MIT. Never read LoopyMSE's or MAME's casloopy source, nor the SR2 MAME-fork
-uPD937 (it was ported from LoopyMSE). Allowed: kasami's Megadoc and Loopy-Tools
-(D:\Homebrew2\CL\docs), Loopy-Schematics, patent US5883611, Hitachi/NEC manuals, our own
+Clean room, MIT. Never read LoopyMSE's or MAME's casloopy source, nor a MAME fork's
+uPD937 that was ported from LoopyMSE. Allowed: kasami's Megadoc and Loopy-Tools,
+Loopy-Schematics, patent US5883611, Hitachi/NEC manuals, our own
 experiments. Other emulators only as black boxes (run them, compare pictures/recordings).
 
 ## Next: Loopy sound, second pass

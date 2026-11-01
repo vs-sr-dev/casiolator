@@ -22,6 +22,11 @@ MAME's `casloopy.zip`; the No-Intro set calls it "[BIOS] Internal Thermal Printe
 it is not). It is looked for in the same places and beside the BIOS, then asked for once;
 without it the games run silent.
 
+One known bad dump: No-Intro's "Little Romance (Japan)", whose `IC104.bin` holds its first
+megabyte twice (the game's own header checksum disagrees). The game starts, but pictures
+from that part of the cartridge are wrong. A good dump is one 3 MB image, CRC32
+`550616f0` in big-endian byte order.
+
 ## Use
 
 Start `casiolator.exe`. Drop a cartridge image on the window, or click to look for one
@@ -90,6 +95,30 @@ Without SDL2 the build is headless only (`--headless --frames N --screenshot f.p
 
 `build/zextest` runs the Z80 exercisers (zexdoc, zexall, not included); the Z80 core passes
 both.
+
+## Translations
+
+English translations of the Loopy games are in the works, starting with Little Romance.
+They will be released as patches (BPS) to apply to your own dump; this repository holds
+the tools, not the games' text. The tools (Python 3, no extra packages):
+
+- `tools/lr_text.py ROM DIR`: extracts Little Romance's script into text files
+- `tools/lr_patch.py ROM DIR OUT.bin [OUT.bps]`: builds the English cartridge and patch
+- `tools/lr_font.py`: the 6-pixel Latin font the patch uses
+
+How the game's text, font and speech balloons work is in `docs/little-romance.md`.
+
+## Development
+
+- `build/shdis file base start end`: SH-1 disassembler for Loopy code
+- `docs/loopy-sound.md`: the Loopy's sound chip and sample ROM, as far as we know
+- `tests/loopy_soundtest`: a homebrew Loopy cartridge that plays every instrument (to
+  compare with a real console)
+- environment variables for the Loopy: `CL_TRACE=n` (trace n instructions), `CL_LOG=1`
+  (unknown I/O, battery RAM writes), `CL_MIDI=file` (what goes to the sound chip),
+  `CL_DUMP=file` with `CL_DUMP_FRAME=n` (video memories), `CL_WATCH=lo-hi` (CPU reads of
+  an address range, hex, with the code that reads)
+- `TODO.md`: what is done and what comes next
 
 ## Licence
 
