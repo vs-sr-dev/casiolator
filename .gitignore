@@ -1,0 +1,6 @@
+roms/
+*.zip
+build*/
+dist/
+screenshots/
+*.ini
