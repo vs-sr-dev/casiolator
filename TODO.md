@@ -100,9 +100,18 @@ First survey (session 2):
   0x37 (4a ど), d8 space/padding, 90 end; menu strings in fixed 4-8 byte fields
   (0x250a0 おんな/おとこ, 0x116160 やさしい/あかるい..., とし は どの くらい); the font has
   only kana: English needs Latin glyphs in unused codes and room for longer strings
-- HARIHARI, Lupiton, Nigaoe, PC Collection, Little Romance: no plain text found; try the
-  relative search per game with words read off the screen (may be custom encodings,
-  compressed, or text drawn in images)
+- Little Romance: EUC-JP (both chips byte-swapped like the rest), NUL-terminated, "／"
+  for a new line, 32-bit pointers before each block (0x2ddd40: どこからはじめる？); about
+  4000 strings, 0x37f56-0x2fb228. The name entry has hiragana, katakana, ABC and kanji
+  pages: the font already has Latin letters
+- Nigaoe Artist: own 16-bit big-endian codes, kana roughly gojuon from 0x20 (not exact
+  further on: check against the font), kanji above (0x1b3 大, 0x31a 出); 0x1fcd40
+  ふつうの大きさのシールが出るよ, 0x1fce70 ...をたしかめてね (two copies)
+- HARIHARI: the menu items are graphics (shadowed font); the dialogue
+  (どんなえのしゅるいをえらぶ？) not found yet: compressed, or another order
+- Lupiton: ゛ ゜ are separate characters on screen (ギ = キ + ゛): search with such a table;
+  ギャラリーだよ しゃしん イラストが いっぱいだよ
+- PC Collection: the menu labels (文章を書く, 絵を描く...) look like graphics
 
 ### PV-1000
 - [ ] Compare with videos of the real console (colours, border, Dig Dug's stripes)
