@@ -9,9 +9,15 @@ Status:
 | System | |
 |-|-|
 | PV-1000 | all 13 games play, with sound |
-| Loopy | in progress |
+| Loopy | all 12 cartridges start and respond; no sound yet, no printer, no mouse |
 
 Casiolator does not come with any game or BIOS: bring your own dumps.
+
+The Loopy needs its BIOS: the 32 KB ROM inside the CPU (`hd6437021.lsi302`, also inside
+MAME's `casloopy.zip`). Casiolator looks for it beside the executable (also in a `bios`
+folder) and beside the game; otherwise the first Loopy game you open asks for it once.
+Note that the 512 KB file some sets call "[BIOS] Internal Thermal Printer" is not it: that
+is the sound chip's sample ROM.
 
 ## Use
 
@@ -42,6 +48,16 @@ player 1.
 | select | Right Shift, Backspace | Back / Select |
 
 Two-player PV-1000 games start with Select, then Start.
+
+| Loopy | Keyboard | Controller |
+|-|-|-|
+| d-pad | arrows | d-pad, left stick |
+| A, B, C, D | Z, X, A, S | A, B, X, Y |
+| L, R | Q, W | shoulders, triggers |
+| Start | Enter | Start |
+
+Loopy games save in `saves/`, next to the executable, whenever the cartridge's battery RAM
+changes.
 
 ### Keys
 

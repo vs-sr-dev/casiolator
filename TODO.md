@@ -22,6 +22,18 @@
 - [ ] Check against videos of the real console (colours, the border, Dig Dug's stripes)
 
 ### 2. Casio Loopy core
+
+Session 1 progress (2026-11-01): SH-1 core (src/sh1.c, from Hitachi's programming manual
+in refs/), SH7021 peripherals (src/sh7021.c), machine (src/loopy.c), VDP renderer
+(src/vdp.c). All 12 cartridges start (Magical Shop with kasami's header). BIOS asked once,
+saves in saves/. 7.5x real time. Still missing: sound, printer, mouse, capture.
+Open questions:
+- [ ] Loopy Town menu: black rectangle over the second item (render bug?)
+- [ ] Anime Land menu: d-pad/A did not visibly change it in a headless test
+- [ ] SH7020/21 hardware manual (refs/sh7020_hw_manual.pdf) to check the peripherals
+      written from SH-1 family knowledge: ITU, DMAC request sources, INTC, SCI timing
+- [ ] Access timings (DRAM rows, refresh, VDP waits) are simplified
+
 Decided (user, 2026-11-01): our own core, clean room, MIT. Do NOT read LoopyMSE's or
 MAME's casloopy source. Allowed sources: kasami's Hardware Megadoc
 (D:\Homebrew2\CL\docs), Loopy-Schematics, the patent US5883611, Hitachi's SH7021/SH-1
