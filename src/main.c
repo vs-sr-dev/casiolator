@@ -183,7 +183,7 @@ static uint32_t s_overlay[OV_W * OV_H];
 static int s_paused, s_fullscreen, s_quit;
 static char s_toast[256];
 static double s_toast_until;
-static uint32_t s_kbd;                       /* keyboard, player 1 */
+static uint32_t s_kbd;                       /* keyboard buttons, see kbd_player */
 static SDL_GameController *s_pad[2];
 
 static double now_s(void)
@@ -357,6 +357,12 @@ static uint32_t pad_buttons(SDL_GameController *c)
 	return b;
 }
 
+/* the keyboard plays the first player without a controller (player 1 if both have one) */
+static int kbd_player(void)
+{
+	return !s_pad[0] ? 0 : !s_pad[1] ? 1 : 0;
+}
+
 static void controller_added(int device)
 {
 	for (int p = 0; p < 2; p++)
@@ -369,7 +375,10 @@ static void controller_added(int device)
 			continue;
 		}
 		if ((s_pad[p] = SDL_GameControllerOpen(device)))
-			toast("player %d: %s", p + 1, SDL_GameControllerName(s_pad[p]));
+		{
+			s_kbd = 0;
+			toast("player %d: %s - keyboard: player %d", p + 1, SDL_GameControllerName(s_pad[p]), kbd_player() + 1);
+		}
 		return;
 	}
 }
@@ -381,7 +390,8 @@ static void controller_removed(SDL_JoystickID id)
 		{
 			SDL_GameControllerClose(s_pad[p]);
 			s_pad[p] = NULL;
-			toast("player %d: controller disconnected", p + 1);
+			s_kbd = 0;
+			toast("player %d: controller disconnected - keyboard: player %d", p + 1, kbd_player() + 1);
 		}
 }
 
@@ -605,8 +615,9 @@ static int run_window(int fullscreen)
 
 		if (s_core && !s_paused)
 		{
-			s_core->set_pad(0, s_kbd | pad_buttons(s_pad[0]));
-			s_core->set_pad(1, pad_buttons(s_pad[1]));
+			const int kp = kbd_player();
+			s_core->set_pad(0, (kp == 0 ? s_kbd : 0) | pad_buttons(s_pad[0]));
+			s_core->set_pad(1, (kp == 1 ? s_kbd : 0) | pad_buttons(s_pad[1]));
 			if (s_audio)
 			{
 				/* the sound card is the clock: emulate until 50 ms of sound wait in the queue */

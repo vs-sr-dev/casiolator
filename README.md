@@ -28,8 +28,10 @@ From a terminal: `casiolator game.zip`. `casiolator --help` lists the options.
 
 ### Controls
 
-Keyboard and controllers are both active. The first controller plugged in is player 1
-(together with the keyboard), the second player 2.
+Controllers are player 1 and player 2 in the order they are plugged in; the keyboard plays
+the first player left without one. So: no controller, the keyboard is player 1; one
+controller, it is player 1 and the keyboard player 2; two controllers, the keyboard joins
+player 1.
 
 | PV-1000 | Keyboard | Controller |
 |-|-|-|
