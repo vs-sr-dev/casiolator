@@ -117,7 +117,8 @@ static void draw_obj(const vdp *v, int y, linebuf *o0, linebuf *o1)
 			continue;
 		if (attr & 0x8000)
 			ty = h - 1 - ty;
-		const int bpp8 = layer == 0 && (ctrl & 0x4000);
+		/* FMT is for both OBJ layers (the register description; Loopy Town's 8bpp cursor is on OBJ1) */
+		const int bpp8 = (ctrl & 0x4000) != 0;
 		const unsigned th = layer == 0 ? (ctrl >> 11) & 7 : (ctrl >> 8) & 7;
 		const unsigned chr = (th << 8) | e[0];
 		const uint16_t subpal = v->reg[V_OBJ_SUBPAL + layer];

@@ -28,7 +28,8 @@ in refs/), SH7021 peripherals (src/sh7021.c), machine (src/loopy.c), VDP rendere
 (src/vdp.c). All 12 cartridges start (Magical Shop with kasami's header). BIOS asked once,
 saves in saves/. 7.5x real time. Still missing: sound, printer, mouse, capture.
 Open questions:
-- [ ] Loopy Town menu: black rectangle over the second item (render bug?)
+- [x] Loopy Town menu: the black rectangle was the hand cursor; OBJ_CTRL FMT applies to
+      OBJ1 too (the Megadoc says both "for both OBJ layers" and "OBJ1 is 4bpp only")
 - [ ] Anime Land menu: d-pad/A did not visibly change it in a headless test
 - [ ] SH7020/21 hardware manual (refs/sh7020_hw_manual.pdf) to check the peripherals
       written from SH-1 family knowledge: ITU, DMAC request sources, INTC, SCI timing

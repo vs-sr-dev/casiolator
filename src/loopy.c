@@ -446,6 +446,23 @@ static void lp_run_frame(void)
 	}
 	L.frame_vdp += (uint64_t)VDP_LINES * VDP_LINE;
 	run_until(cpu_at(L.frame_vdp));
+
+	/* CL_DUMP=file and CL_DUMP_FRAME=n: the VDP's memories and registers after frame n */
+	static long frame_no;
+	const char *df = getenv("CL_DUMP"), *dn = getenv("CL_DUMP_FRAME");
+	if (df && dn && ++frame_no == atol(dn))
+	{
+		FILE *f = fopen(df, "wb");
+		if (f)
+		{
+			fwrite(L.v.tile, 1, sizeof(L.v.tile), f);
+			fwrite(L.v.oam, 1, sizeof(L.v.oam), f);
+			fwrite(L.v.pal, 1, sizeof(L.v.pal), f);
+			fwrite(L.v.reg, 2, 0x4000, f);
+			fwrite(L.v.bitmap, 1, sizeof(L.v.bitmap), f);
+			fclose(f);
+		}
+	}
 	if (L.log)
 		fprintf(stderr, "frame end: pc %08x sr %03x vbr %08x\n", L.cpu.pc, L.cpu.sr, L.cpu.vbr);
 
