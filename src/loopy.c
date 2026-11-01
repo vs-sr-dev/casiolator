@@ -48,6 +48,9 @@ static struct
 	int alen;
 } L;
 
+/* CL_MIDI=file: what goes to the sound chip, with the time in seconds */
+static FILE *s_midi_log;
+
 /* ---- time ---- */
 
 static uint64_t cpu_at(uint64_t vdp_cycle)
@@ -190,7 +193,11 @@ static void vdp_w16(uint32_t a, uint16_t d)
 	else if (o == 0x60000)
 		v->sync_shift = d;
 	else if (o >= 0x80000 && o < 0xa0000)
+	{
 		v->sound_ctrl = d;
+		if (s_midi_log)
+			fprintf(s_midi_log, "%.6f ctrl %04x\n", L.cyc / 16e6, d);
+	}
 	else if (L.log)
 		fprintf(stderr, "vdp: write %06x = %04x\n", o, d);
 }
@@ -350,6 +357,8 @@ static void sci_tx(void *c, int ch, uint8_t b)
 {
 	if (L.log)
 		fprintf(stderr, "sci%d: %02x\n", ch, b);
+	if (s_midi_log && ch == 1)
+		fprintf(s_midi_log, "%.6f %02x\n", L.cyc / 16e6, b);
 }
 
 /* ---- run ---- */
@@ -519,6 +528,8 @@ static int lp_load(const uint8_t *rom, size_t size, char *err, size_t errn)
 	const char *t = getenv("CL_TRACE");
 	L.trace = t ? atoi(t) : 0;
 	L.log = getenv("CL_LOG") != NULL;
+	if (getenv("CL_MIDI") && !s_midi_log)
+		s_midi_log = fopen(getenv("CL_MIDI"), "w");
 	lp_reset();
 	return 1;
 }

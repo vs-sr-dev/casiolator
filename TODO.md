@@ -41,8 +41,11 @@ manuals, NEC docs, and our own experiments. LoopyMSE / zRupi / MAME may be run a
 boxes (compare screens, sound, timing), never read. Pieces:
 - [ ] SH-1 (SH7021) interpreter + on-chip peripherals (ITU timers, DMA, SCI, IRQs)
 - [ ] VDP RH-7500: bitmap layers, tilemaps, sprites, the line buffer / capture
-- [ ] Sound: uPD937 (NEC CDT-109) with the sound BIOS; the clean-room synth from the
-      MAME fork in D:\Homebrew2\CL\emu\mame-fork (src/devices/sound/upd937.cpp) is ours
+- [ ] Sound: uPD937 (NEC CDT-109) and its 512 KB sample ROM (hn62434fa, CRC 8f51fa17).
+      Clean room from scratch (user, 2026-11-01): the SR2 MAME-fork synth was ported
+      from LoopyMSE and must not be reused. Sources: Megadoc, kasami's "Music track
+      format.txt" (MIDI subset, modes, polyphony), analysis of the sample ROM, the MIDI
+      the games send on SCI1; other emulators only as black boxes (WAV comparison).
 - [ ] Cartridge SRAM saves (.sav beside the game or in saves/)
 - [ ] BIOS: ask once, remember it (the No-Intro "[BIOS] Internal Thermal Printer" file is
       the main BIOS, md5 c0f1c899...; the sound BIOS is HD6437021's internal ROM)
