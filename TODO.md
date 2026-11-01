@@ -92,6 +92,17 @@ compose the three colour passes, write a PNG in prints/.
 Text encoding and fonts of the Loopy games (Shift-JIS? tiles?), free ROM space, an
 IPS/BPS applier at load time (patch file beside the game, the ROM never changed).
 Target language: English, for an international audience (user, 2026-11-01).
+First survey (session 2):
+- plain Shift-JIS text: Wanwan Aijou Monogatari (~45k characters, the whole adventure),
+  Dream Change (~37k, dialogue), Loopy Town (~6k); Dream Change also has a full-width
+  ASCII table, likely an SJIS-indexed font
+- Anime Land: own 1-byte encoding, gojuon order (00 あ .. 2d ん), 36 っ, voiced = base +
+  0x37 (4a ど), d8 space/padding, 90 end; menu strings in fixed 4-8 byte fields
+  (0x250a0 おんな/おとこ, 0x116160 やさしい/あかるい..., とし は どの くらい); the font has
+  only kana: English needs Latin glyphs in unused codes and room for longer strings
+- HARIHARI, Lupiton, Nigaoe, PC Collection, Little Romance: no plain text found; try the
+  relative search per game with words read off the screen (may be custom encodings,
+  compressed, or text drawn in images)
 
 ### PV-1000
 - [ ] Compare with videos of the real console (colours, border, Dig Dug's stripes)
