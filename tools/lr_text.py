@@ -127,6 +127,16 @@ def pointers(rom):
     return refs
 
 
+SCRIPTS = 0x2d8000               # message records from here: message, then 3 answers
+
+
+def kind(block, at):
+    """What shows a string, from where its pointers are."""
+    if block < SCRIPTS:
+        return "ui"
+    return "answer" if any(4 <= x - block <= 12 for x in at) else "box"
+
+
 def dialogue(rom, refs, out):
     found = {}
     for t, at in refs.items():
@@ -152,12 +162,14 @@ def dialogue(rom, refs, out):
     n = chars = 0
     with Out(out) as f:
         f.write("# Little Romance: text reached through pointers. ／ = new line, ＠ = player's name,\n"
-                "# □■△▲▽▼ = the other names. Message boxes: 3 lines of 16 characters.\n\n")
+                "# □■△▲▽▼ = the other names. Kinds: box = message box (3 lines of 16 characters,\n"
+                "# pages), answer = one line in the answer box, ui = menus and labels in the code.\n\n")
         for a, ts in sorted(blocks, key=lambda b: b[1][0]):
             f.write("## pointers at %06x\n" % a)
             for t in ts:
                 s, at = found[t]
-                f.write("[%06x] refs %s\nJP %s\nEN \n" % (t, " ".join("%06x" % x for x in at), show(s)))
+                f.write("[%06x] %s refs %s\nJP %s\nEN \n" % (
+                    t, kind(a, at), " ".join("%06x" % x for x in at), show(s)))
                 n += 1
                 chars += len(s) // 2
             f.write("\n")

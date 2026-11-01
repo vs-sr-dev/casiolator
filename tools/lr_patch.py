@@ -29,6 +29,7 @@ NEW_SIZE = 0x400000
 FREE = 0x300000                  # the added megabyte
 LINE_CODES = 17                  # message box line, in 12-pixel cells (16 in Japanese)
 LINE_HALVES = 2 * LINE_CODES - 1  # the border hides the right half of the 17th cell
+ANSWER_CODES = 16                # an answer: one line, the highlight is 16 cells wide
 LINE_PATCH = 0xd630              # mov #16,r6: the line length the message box asks for
 NAME_CELLS = 5                   # a name code can grow to 5 cells
 NAMES = "＠□■△▲▽▼"
@@ -42,18 +43,26 @@ SLASH = b"\xa1\xbf"
 
 
 def entries(path):
-    """[(key, refs, english)] of a script file, in order."""
-    out, cur = [], None
+    """[(key, refs, english, kind)] of a script file, in order. An entry 'same as'
+    another takes its English when it has none."""
+    out, cur, same = [], None, {}
     for line in open(path, encoding="utf-8"):
         line = line.rstrip("\n")
         if line.startswith("["):
             key = line[1:line.index("]")]
             rest = line[line.index("]") + 1:].split()
-            refs = [int(x, 16) for x in rest[1:]] if rest[:1] == ["refs"] else []
-            cur = [key, refs, ""]
+            refs = [int(x, 16) for x in rest[rest.index("refs") + 1:]] if "refs" in rest else []
+            kind = rest[0] if rest and rest[0] in ("box", "answer", "ui") else ""
+            if "same" in rest:
+                same[key] = rest[rest.index("same") + 2]
+            cur = [key, refs, "", kind]
             out.append(cur)
         elif line.startswith("EN ") and cur:
             cur[2] = line[3:].strip()
+    en = {e[0]: e[2] for e in out}
+    for e in out:
+        if not e[2] and e[0] in same:
+            e[2] = en.get(same[e[0]], "")
     return out
 
 
@@ -204,6 +213,11 @@ class Encoder:
         return SLASH.join(out)
 
 
+def jp_cells(rom, key):
+    """Width of the Japanese string at key, in cells."""
+    return len(rom.text(int(key, 16))) // 2
+
+
 def bps(source, target):
     """A BPS patch: copy from the source where the bytes agree, runs of one byte value
     as a byte and a copy of it, literal bytes elsewhere."""
@@ -263,16 +277,26 @@ def main():
     # text first: the font size depends on the letter pairs used
     script = lambda name: entries(os.path.join(sys.argv[2], name))
     texts = []
-    for key, refs, en in script("dialogue.txt"):
-        if en:
+    for key, refs, en, kind in script("dialogue.txt"):
+        if not en:
+            continue
+        if kind == "box":
             texts.append((refs, enc.encode(en)))
+            continue
+        # answers: one line in a box of 16 cells; menus and labels: no wider than the
+        # Japanese until each place is checked
+        code = enc.encode(en, halves=999, page=1)
+        width = 2 * ANSWER_CODES if kind == "answer" else 2 * jp_cells(rom, key)
+        if enc.line_width(enc.tokens(en)) > width:
+            sys.exit("%s [%s]: %r is wider than %d letters" % (kind, key, en, width))
+        texts.append((refs, code))
 
     # balloons: drawn horizontally (flag 0x20 off: the game draws the text in rows and
     # a balloon that fits); one row per |, 23 codes and the NUL at most.
     # {at=xx,yy} places the balloon's centre, {shape=nn} picks another outline (hex, as
     # in the record: 0 none, 3 shout, 4 oval with a tail, 7 box, 10 thought...)
     balloons = 0
-    todo = [(k, en) for k, _, en in script("balloons.txt") if en]
+    todo = [(k, en) for k, _, en, _ in script("balloons.txt") if en]
     for key, en in todo:
         # {swap}: the two balloons of the panel trade places (Japanese reads the right
         # one first; English wants it on the left)
@@ -301,8 +325,23 @@ def main():
         d[o + 4:o + 52] = code + bytes(48 - len(code))
         balloons += 1
 
+    # sound effects: 16 bytes (8 codes; the NUL only if shorter); | between columns or
+    # rows as in the balloons. {hdr=16 hex digits} replaces the 8-byte header (tests)
+    for key, _, en, _ in script("sfx.txt"):
+        if not en:
+            continue
+        r = int(key, 16)
+        m = re.match(r"\{hdr=([0-9a-fA-F]{16})\}", en)
+        if m:
+            d[r + 0x98:r + 0xa0] = bytes.fromhex(m.group(1))
+            en = en[m.end():]
+        code = enc.encode(en, halves=999, page=1)
+        if len(code) > 16:
+            sys.exit("sound effect %s: %d codes, 8 at most" % (key, len(code) // 2))
+        d[r + 0xa0:r + 0xb0] = code + bytes(16 - len(code))
+
     # default names: 4 codes and the NUL
-    for key, _, en in script("names.txt"):
+    for key, _, en, _ in script("names.txt"):
         if en:
             code = enc.encode(en, halves=8)
             o = int(key, 16)

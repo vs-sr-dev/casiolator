@@ -109,11 +109,30 @@ the script files and builds a 4 MB image:
 Tested in Casiolator: the title menu, the introduction, the profile questions and the
 first panel (Masumi) in English.
 
+## Boxes and sound effects (session 3)
+
+lr_text.py tags each pointer string with what shows it:
+- `box`: the message of a record (pointer at record+8): 3 lines, pages, 33 letters.
+- `answer`: record+12, +16, +20 (up to 3): the answer box (0x0e00e3d0) prints each on
+  ONE line; `／` is printed, not obeyed. The highlight is 16 cells: 32 letters at most
+  (40 run off the box and wrap round the screen). The lesson questions (0x2eb000 on)
+  use the same records.
+- `ui`: strings in the code banks (menus, tool names, debug screens): kept no wider
+  than the Japanese until each place is checked. The name-entry keyboards (pointers at
+  0x2fb22c) are ui too: they are not translated, they are the letters you can type.
+
+Sound effects: 0x0e012666 copies them to RAM. Header (record+0x98): type, style, flags
+(rotation?), 0, x, y, width, height of a letter; then 8 codes. The type goes through a
+table that comes with each story: a type the story does not have is dropped (an
+effect added to the introduction panel is not drawn). Letters are drawn scaled, so
+pairs should work; to try in a story that has effects.
+
 ## Still to do
 
 1. Translate everything (Claude translates, the user plays and reviews).
-2. Choice boxes, captions and menus: check their widths (wrapped like message boxes now).
-3. Sound effects (16 bytes, 8 codes): probably the same balloon code; to try.
+2. Two lesson answers have a `／` in Japanese (0x2ee649, 0x2eff1d): see how their
+   screen shows them.
+3. Sound effects: try them in a story that uses them (see below).
 4. Graphics with Japanese text: survey the screens, redraw.
 5. The player types the heroine's name on the ABC page in full-width letters (12 pixels
    each, 5 at most): fine, but could use the pairs later.
