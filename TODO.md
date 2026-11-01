@@ -152,4 +152,3 @@ boot, one to polish (TMS9918A modes, sprites, 4 per line, collisions).
 - [ ] Save states
 - [ ] Release packaging (zip with SDL2.dll, README, licences), Linux build
 - [ ] libretro core (core.h is shaped for it)
-- [ ] Name: "Casiolator" is the working name
