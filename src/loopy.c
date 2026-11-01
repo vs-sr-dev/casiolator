@@ -253,7 +253,7 @@ static void w8(void *c, uint32_t a, uint8_t v)
 	switch (area(a))
 	{
 	case 1: L.dram[a & (DRAM_SIZE - 1)] = v; return;
-	case 2: if (L.sram_size) L.sram[a % L.sram_size] = v; return;
+	case 2: if (L.sram_size) L.sram[a % L.sram_size] = v; if (L.log) fprintf(stderr, "sram %08x=%02x\n", a, v); return;
 	case 4:
 		if (a & 0x08000000)
 		{
@@ -543,6 +543,16 @@ static void lp_set_pad(int pad, uint32_t buttons)
 		L.pad[pad] = buttons;
 }
 
+static uint8_t *lp_save_ram(size_t *size)
+{
+	*size = L.sram_size;
+	return L.sram_size ? L.sram : NULL;
+}
+
+static const char *const s_bios_names[] = {
+	"hd6437021.lsi302", "casloopy.zip", "bios/hd6437021.lsi302", "bios/casloopy.zip", "loopy_bios.bin", NULL
+};
+
 const core core_loopy = {
 	"Casio Loopy", "loopy",
 	LOOPY_W, 224,
@@ -551,4 +561,9 @@ const core core_loopy = {
 	32000.0,
 	lp_load, lp_reset, lp_run_frame, lp_framebuffer, lp_audio_take, lp_set_pad,
 	lp_load_bios,
+	0x8c57ff9f, BIOS_SIZE,
+	"The Casio Loopy needs its BIOS: the 32 KB ROM inside the SH7021 CPU (HD6437021, "
+	"\"hd6437021.lsi302\"). Choose that file, or a zip with it such as MAME's casloopy.zip.",
+	s_bios_names,
+	lp_save_ram,
 };

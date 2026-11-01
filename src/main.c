@@ -93,29 +93,154 @@ static void report(const char *fmt, ...)
 	fprintf(stderr, "%s\n", msg);
 }
 
+/* the window asks for a BIOS file (NULL headless): 1 and the path, 0 if cancelled */
+static int (*s_ask_bios)(const core *c, const char *why, char *out, size_t n);
+static const core *s_bios_core;      /* the system whose BIOS is loaded */
+
+static int try_bios(const core *c, const char *path, char *err, size_t errn)
+{
+	uint8_t *b;
+	size_t n;
+	const int r = bios_open(path, c->bios_crc, c->bios_size, &b, &n, err, errn);
+	if (!r)
+		return 0;
+	const int ok = c->load_bios(b, n, err, errn);
+	free(b);
+	if (ok && r == 2)
+		report("%s: not the known BIOS dump (CRC differs), trying it anyway", path);
+	return ok;
+}
+
+/* load the system's BIOS: --bios, the remembered file, the usual names beside the
+ * executable or the game, and last the user (once; the choice is remembered) */
+static int ensure_bios(const core *c, const char *game_path, char *err, size_t errn)
+{
+	if (!c->load_bios || s_bios_core == c)
+		return 1;
+	char dir[1024], gdir[1024], p[2200], e2[512];
+	if (s_bios_arg)
+	{
+		if (!try_bios(c, s_bios_arg, err, errn))
+			return 0;
+		s_bios_core = c;
+		return 1;
+	}
+	if (g_config.loopy_bios[0] && try_bios(c, g_config.loopy_bios, e2, sizeof(e2)))
+	{
+		s_bios_core = c;
+		return 1;
+	}
+	os_exe_dir(dir, sizeof(dir));
+	snprintf(gdir, sizeof(gdir), "%s", game_path);
+	char *slash = NULL;
+	for (char *q = gdir; *q; q++)
+		if (*q == '/' || *q == '\\')
+			slash = q;
+	if (slash)
+		*slash = 0;
+	else
+		snprintf(gdir, sizeof(gdir), ".");
+	const char *const dirs[] = { dir, gdir };
+	for (int d = 0; d < 2; d++)
+		for (int k = 0; c->bios_names[k]; k++)
+		{
+			snprintf(p, sizeof(p), "%s/%s", dirs[d], c->bios_names[k]);
+			FILE *f = os_fopen(p, "rb");
+			if (!f)
+				continue;
+			fclose(f);
+			if (try_bios(c, p, e2, sizeof(e2)))
+			{
+				snprintf(g_config.loopy_bios, sizeof(g_config.loopy_bios), "%.1000s", p);
+				s_bios_core = c;
+				return 1;
+			}
+		}
+	if (!s_ask_bios)
+	{
+		snprintf(err, errn, "%s needs its BIOS: use --bios", c->name);
+		return 0;
+	}
+	const char *why = c->bios_desc;
+	for (;;)
+	{
+		if (!s_ask_bios(c, why, p, sizeof(p)))
+		{
+			snprintf(err, errn, "%s needs its BIOS", c->name);
+			return 0;
+		}
+		if (try_bios(c, p, e2, sizeof(e2)))
+			break;
+		why = e2;
+	}
+	snprintf(g_config.loopy_bios, sizeof(g_config.loopy_bios), "%.1000s", p);
+	s_bios_core = c;
+	return 1;
+}
+
+/* ---- battery saves: saves/<title>.sav beside the executable ---- */
+
+static uint8_t s_saved[0x10000];     /* what the file holds, to write only on changes */
+
+static void save_path(char *out, size_t n)
+{
+	char dir[1024];
+	os_data_dir(dir, sizeof(dir));
+	snprintf(out, n, "%s/saves/%s.sav", dir, s_game.title);
+}
+
+static void save_load(void)
+{
+	size_t size;
+	uint8_t *ram = s_core && s_core->save_ram ? s_core->save_ram(&size) : NULL;
+	if (!ram || size > sizeof(s_saved))
+		return;
+	char path[1400];
+	save_path(path, sizeof(path));
+	FILE *f = os_fopen(path, "rb");
+	if (f)
+	{
+		if (fread(ram, 1, size, f) != size)
+			report("%s: shorter than the cartridge RAM", path);
+		fclose(f);
+	}
+	memcpy(s_saved, ram, size);
+}
+
+/* write the battery RAM if it changed */
+static void save_flush(void)
+{
+	size_t size;
+	uint8_t *ram = s_core && s_core->save_ram ? s_core->save_ram(&size) : NULL;
+	if (!ram || size > sizeof(s_saved) || !memcmp(ram, s_saved, size))
+		return;
+	char dir[1024], path[1400];
+	os_data_dir(dir, sizeof(dir));
+	snprintf(path, sizeof(path), "%s/saves", dir);
+	os_mkdir(path);
+	save_path(path, sizeof(path));
+	FILE *f = os_fopen(path, "wb");
+	if (!f)
+	{
+		report("cannot write %s", path);
+		return;
+	}
+	fwrite(ram, 1, size, f);
+	fclose(f);
+	memcpy(s_saved, ram, size);
+}
+
 static int load_game(const char *path, char *err, size_t errn)
 {
 	game g;
 	if (!game_open(path, &g, err, errn))
 		return 0;
-	if (g.sys->load_bios && s_bios_arg)
+	if (!ensure_bios(g.sys, path, err, errn))
 	{
-		size_t n;
-		uint8_t *b = file_read(s_bios_arg, &n);
-		if (!b)
-		{
-			snprintf(err, errn, "cannot read %s", s_bios_arg);
-			game_free(&g);
-			return 0;
-		}
-		const int ok = g.sys->load_bios(b, n, err, errn);
-		free(b);
-		if (!ok)
-		{
-			game_free(&g);
-			return 0;
-		}
+		game_free(&g);
+		return 0;
 	}
+	save_flush();                        /* the game being left, before the core is reused */
 	if (!g.sys->load(g.data, g.size, err, errn))
 	{
 		game_free(&g);
@@ -124,6 +249,7 @@ static int load_game(const char *path, char *err, size_t errn)
 	game_free(&s_game);
 	s_game = g;
 	s_core = g.sys;
+	save_load();
 	return 1;
 }
 
@@ -172,6 +298,7 @@ static int run_headless(long frames, const char *shot, const char *wav)
 		write_wav_header(wf, (uint32_t)(s_core->audio_rate + 0.5), wn);
 		fclose(wf);
 	}
+	save_flush();
 	if (shot && !png_write(shot, s_core->framebuffer(), s_core->width, s_core->width, s_core->height))
 	{
 		report("cannot write %s", shot);
@@ -278,6 +405,15 @@ static void open_path(const char *path)
 		remember_folder(path);
 		toast("%s", err);
 	}
+}
+
+/* the first Loopy game with no BIOS around: say what is needed, then the file dialog */
+static int ask_bios(const core *c, const char *why, char *out, size_t n)
+{
+	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, c->name, why, s_win);
+	const int ok = os_pick_file(s_win, OS_PICK_BIOS, g_config.game_dir, out, n);
+	SDL_RaiseWindow(s_win);
+	return ok;
 }
 
 static void open_dialog(void)
@@ -547,7 +683,7 @@ static void key_event(const SDL_KeyboardEvent *k)
 	}
 }
 
-static int run_window(int fullscreen)
+static int run_window(int fullscreen, const char *path)
 {
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0)
 	{
@@ -579,10 +715,11 @@ static int run_window(int fullscreen)
 	else
 		report("no audio: %s", SDL_GetError());
 
-	if (s_core)
-		start_game();
-	else
-		set_title();
+	set_title();
+	SDL_ShowWindow(s_win);
+	s_ask_bios = ask_bios;
+	if (path)
+		open_path(path);
 	if (fullscreen)
 		toggle_fullscreen();
 
@@ -658,7 +795,15 @@ static int run_window(int fullscreen)
 			frames = 0;
 		}
 		present();
+
+		static uint32_t last_flush;
+		if (SDL_GetTicks() - last_flush > 5000)
+		{
+			last_flush = SDL_GetTicks();
+			save_flush();
+		}
 	}
+	save_flush();
 
 	if (s_audio)
 		SDL_CloseAudioDevice(s_audio);
@@ -746,14 +891,7 @@ int main(int argc, char **argv)
 #ifdef CL_HAVE_SDL
 	os_console_attach();
 	config_load();
-	if (path)
-	{
-		if (load_game(path, err, sizeof(err)))
-			remember_folder(path);
-		else
-			report("%s", err);
-	}
-	return run_window(fullscreen);
+	return run_window(fullscreen, path);
 #else
 	report("built without SDL: use --headless");
 	return 2;

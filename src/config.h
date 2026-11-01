@@ -8,6 +8,7 @@
 typedef struct
 {
 	char game_dir[1024];      /* folder of the last cartridge opened, for the dialog */
+	char loopy_bios[1024];    /* the Loopy BIOS file (or a zip with it) */
 	int volume;               /* 0..100 */
 	int scale;                /* window height as a multiple of the system's lines */
 } config;

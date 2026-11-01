@@ -41,6 +41,7 @@ int config_load(void)
 		*eq = 0;
 		const char *key = trim(s), *val = trim(eq + 1);
 		if (!strcmp(key, "game_folder")) snprintf(g_config.game_dir, sizeof(g_config.game_dir), "%s", val);
+		else if (!strcmp(key, "loopy_bios")) snprintf(g_config.loopy_bios, sizeof(g_config.loopy_bios), "%s", val);
 		else if (!strcmp(key, "volume")) g_config.volume = clamp(atoi(val), 0, 100);
 		else if (!strcmp(key, "scale")) g_config.scale = clamp(atoi(val), 1, 8);
 	}
@@ -56,6 +57,7 @@ int config_save(void)
 	if (!f) return 0;
 	fprintf(f, "# Casiolator settings, rewritten on exit\n");
 	fprintf(f, "game_folder = %s\n", g_config.game_dir);
+	fprintf(f, "loopy_bios = %s\n", g_config.loopy_bios);
 	fprintf(f, "volume = %d\n", g_config.volume);
 	fprintf(f, "scale = %d\n", g_config.scale);
 	return fclose(f) == 0;

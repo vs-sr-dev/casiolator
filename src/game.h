@@ -22,6 +22,11 @@ typedef struct
 int game_open(const char *path, game *g, char *err, size_t errn);
 void game_free(game *g);
 
+/* a BIOS image from a plain file or a zip: 1 if it has the expected CRC, 2 if only the size
+ * matches (another dump), 0 and a message if it is not usable; *out is malloc'd */
+int bios_open(const char *path, uint32_t want_crc, size_t want_size, uint8_t **out, size_t *out_size,
+	char *err, size_t errn);
+
 /* whole file into memory (malloc'd), NULL if it cannot be read */
 uint8_t *file_read(const char *path, size_t *size);
 

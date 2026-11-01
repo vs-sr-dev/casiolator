@@ -107,7 +107,21 @@ static int classify(game *g, uint8_t *data, size_t size, const char *name, char 
 		g->system = SYS_PV1000;
 	else if (size >= 0x80000 && size <= 0x400000 && !(size & 0xffff))
 	{
-		/* headerless Loopy image (Magical Shop): the byte order is found by the core */
+		/* headerless Loopy image (Magical Shop): NOP (0x0009) is common in SH code, so
+		 * count it in both byte orders; then the header kasami documents for it */
+		size_t be = 0, le = 0;
+		for (size_t i = 0x400; i + 1 < size && i < 0x40000; i += 2)
+		{
+			be += data[i] == 0x00 && data[i + 1] == 0x09;
+			le += data[i] == 0x09 && data[i + 1] == 0x00;
+		}
+		if (le > be)
+			swap16(data, size);
+		static const uint8_t header[28] = {
+			0x0e, 0x00, 0x00, 0x80, 0x0e, 0x0f, 0xff, 0xfe, 0x40, 0xf5, 0x4d, 0xd7, 0xff, 0xff, 0xff, 0xff,
+			0x02, 0xff, 0xff, 0xff, 0x02, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xfe };
+		if (size == 0x100000)
+			memcpy(data, header, sizeof(header));
 		g->system = SYS_LOOPY;
 	}
 	else
@@ -270,6 +284,51 @@ int game_open(const char *path, game *g, char *err, size_t errn)
 	else
 		make_title(path, g->title, sizeof(g->title));
 	return 1;
+}
+
+int bios_open(const char *path, uint32_t want_crc, size_t want_size, uint8_t **out, size_t *out_size,
+	char *err, size_t errn)
+{
+	size_t size;
+	uint8_t *data = file_read(path, &size);
+	*out = NULL;
+	if (!data)
+	{
+		snprintf(err, errn, "cannot read %s", base_name(path));
+		return 0;
+	}
+	if (size >= 4 && data[0] == 'P' && data[1] == 'K' && data[2] == 3 && data[3] == 4)
+	{
+		/* a zip (MAME's casloopy.zip, say): the entry with the right CRC, else the size */
+		static zip_entry e[MAX_ENTRIES];
+		const int n = zip_list(data, size, e, MAX_ENTRIES);
+		int pick = -1;
+		for (int i = 0; i < n && pick < 0; i++)
+			if (e[i].crc == want_crc)
+				pick = i;
+		for (int i = 0; i < n && pick < 0; i++)
+			if (e[i].size == want_size)
+				pick = i;
+		uint8_t *b = pick >= 0 ? zip_extract(data, size, &e[pick]) : NULL;
+		free(data);
+		if (!b)
+		{
+			snprintf(err, errn, "%s has no %u KB BIOS in it", base_name(path), (unsigned)(want_size / 1024));
+			return 0;
+		}
+		data = b;
+		size = e[pick].size;
+	}
+	if (size != want_size)
+	{
+		snprintf(err, errn, "%s is not the BIOS (%u KB, it should be %u KB)", base_name(path),
+			(unsigned)(size / 1024), (unsigned)(want_size / 1024));
+		free(data);
+		return 0;
+	}
+	*out = data;
+	*out_size = size;
+	return crc32_update(0, data, size) == want_crc ? 1 : 2;
 }
 
 void game_free(game *g)

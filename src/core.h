@@ -28,6 +28,11 @@ typedef struct core
 	void (*set_pad)(int pad, uint32_t buttons);
 	/* the system's BIOS (copied), NULL if it has none; 0 and a message if it is not one */
 	int (*load_bios)(const uint8_t *data, size_t size, char *err, size_t errn);
+	uint32_t bios_crc, bios_size;  /* the known dump */
+	const char *bios_desc;         /* what to tell the user who has to find it */
+	const char *const *bios_names; /* file names to look for, NULL-terminated */
+	/* battery-backed RAM the frontend keeps in a file (NULL if none) */
+	uint8_t *(*save_ram)(size_t *size);
 } core;
 
 extern const core core_pv1000;
