@@ -29,6 +29,27 @@
   each frame end), CL_MIDI=file (bytes to the sound chip and SOUND_CTRL writes, timed),
   CL_DUMP=file + CL_DUMP_FRAME=n (VDP memories and registers), build/shdis (disassembler).
 
+### Session 2 (2026-11-01)
+
+- Loopy sound, clean room (src/upd937.c, docs/loopy-sound.md): the whole sample ROM layout
+  decoded (programs, split maps, zones of two layers, samples with key/start/end/loop,
+  envelopes with a release half, pitch modulation, the rate, amplitude and pitch tables);
+  MIDI parser with running status, modes and voices per channel (6/4/2/4, 3 channels,
+  12), two-zone programs taking two voices, sustain pedal, pitch bend, the volume sliders,
+  layers left and right, linear interpolation, the output filter from kasami's
+  schematics. 84863 Hz stereo; the frontend went stereo (core.audio_channels).
+- Second ROM support in the frontend (core.load_aux): the sample ROM is looked for beside
+  the executable, the game and the BIOS (also in casloopy.zip), then asked for once;
+  `--samples`, `loopy_sound` in casiolator.ini. Without it the Loopy is silent.
+- SH7021 DMA fix: a DMA write to SCI TDR asked for the next byte before the channel had
+  moved on, so the second byte of every BIOS MIDI message repeated the first (lost
+  program changes and note-offs).
+- A program change ends the channel's notes (the BIOS changes tracks that way; user found
+  notes hanging across screens).
+- Test cartridge tests/loopy_soundtest (all programs, range, bend, sustain, velocity,
+  polyphony, volumes); recorded in the SR2 MAME fork as a black box
+  (byte-swapped cartridge; retail games are silent there: its SCI1 does not take DMA).
+
 ## Rules for the Loopy (user, 2026-11-01)
 
 Clean room, MIT. Never read LoopyMSE's or MAME's casloopy source, nor the SR2 MAME-fork
@@ -36,31 +57,17 @@ uPD937 (it was ported from LoopyMSE). Allowed: kasami's Megadoc and Loopy-Tools
 (D:\Homebrew2\CL\docs), Loopy-Schematics, patent US5883611, Hitachi/NEC manuals, our own
 experiments. Other emulators only as black boxes (run them, compare pictures/recordings).
 
-## Next session: Loopy sound
+## Next: Loopy sound, second pass
 
-Start from docs/loopy-sound.md (what we found so far: ROM layout, 12-bit samples, MIDI).
-
-1. **Reference recordings (black box).** Best: the real console, if available. Otherwise
-   the SR2 MAME fork (`-wavwrite`) or LoopyMSE/zRupi run as programs. Make a tiny test
-   cartridge with the SR2 toolchain (sh-elf-gcc in WSL, D:\Homebrew2\CL) that sends known
-   MIDI on SCI1: each program 0-109 playing one note (e.g. C4, 1 s on, 1 s off), plus a
-   few notes over the range for pitch, a pitch bend and a sustain. Record it; it becomes
-   the yardstick for every step below.
-2. **Sample ROM tables (0x00000-0x0bfff).** The seven header words (021b 0311 036a 0532
-   05ae 3500 24e3): offsets of sub-tables? Find the 110 program entries: sample start /
-   loop / end in the 0x0c000+ area, root key or pitch, envelope references. Look for runs
-   of addresses that point into 0x0c000-0x7ffff.
-3. **Low nibble of the sample words.** Where it changes along a waveform; whether it marks
-   loop points or sample ends (compare with the boundaries found in step 2).
-4. **Synth (src/upd937.c, new).** MIDI parser (running status included), the modes and
-   voice counts from SOUND_CTRL (kasami: 6/4/2/4 voices in mode 0, 12 in mode 3), voice
-   allocation, pitch from the note (and the 8-bit pitch bend, +/- 2 semitones), sample
-   playback with loop, envelope, sustain, stereo. Output at 84864 Hz (Megadoc), then the
-   frontend's resampler; the analogue filter's slight boost near 7.5 kHz last.
-5. **Hook up:** SCI1 bytes to the synth with their time (CL_MIDI shows they already
-   arrive), SOUND_CTRL buttons (ON resets, MIDI mode, CH3/CH4/EXT, DEMO, volumes),
-   the core's audio_take, `--wav` for comparisons.
-6. Wanwan Aijou Monogatari's OKI MSM6653A sound effects (expansion audio, 0x040a0000):
+1. **A recording of the real console** playing tests/loopy_soundtest (needs a flash
+   cartridge), or at least of game music (boot jingle, title screens) to compare by ear
+   and by spectrum. It settles the open questions in docs/loopy-sound.md: envelope time
+   base (now one step per output frame, rate table entry 2 * rate), pitch modulation
+   speed and delay units, `(n, 00)` envelope pairs, interpolation, the 8 cents.
+2. User listening pass in the window: wrong instruments, stuck notes, too loud or quiet
+   (mix: 12-bit sample * level >> 14 per layer).
+3. Rhythm part (mode 1, EXT, real-time messages), DEMO button, programs 110-111.
+4. Wanwan Aijou Monogatari's OKI MSM6653A sound effects (expansion audio, 0x040a0000):
    samples are inside that chip, not dumped as far as we know; leave for later.
 
 ## Later
@@ -84,6 +91,7 @@ compose the three colour passes, write a PNG in prints/.
 ### Translation patches
 Text encoding and fonts of the Loopy games (Shift-JIS? tiles?), free ROM space, an
 IPS/BPS applier at load time (patch file beside the game, the ROM never changed).
+Target language: English, for an international audience (user, 2026-11-01).
 
 ### PV-1000
 - [ ] Compare with videos of the real console (colours, border, Dig Dug's stripes)

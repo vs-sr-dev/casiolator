@@ -16,14 +16,15 @@ typedef struct core
 	int width, height;           /* framebuffer, 0x00RRGGBB */
 	double aspect;               /* display aspect ratio of the whole framebuffer */
 	double fps;
-	double audio_rate;           /* mono int16 samples per emulated second */
+	double audio_rate;           /* int16 sample frames per emulated second */
+	int audio_channels;          /* 1, or 2 for interleaved left and right */
 
 	/* a cartridge image (copied); 0 and a message in err if it cannot be used */
 	int (*load)(const uint8_t *rom, size_t size, char *err, size_t errn);
 	void (*reset)(void);
 	void (*run_frame)(void);
 	const uint32_t *(*framebuffer)(void);
-	/* audio produced so far, up to max samples; returns how many */
+	/* audio produced so far, up to max frames; returns how many */
 	int (*audio_take)(int16_t *out, int max);
 	void (*set_pad)(int pad, uint32_t buttons);
 	/* the system's BIOS (copied), NULL if it has none; 0 and a message if it is not one */
@@ -33,6 +34,12 @@ typedef struct core
 	const char *const *bios_names; /* file names to look for, NULL-terminated */
 	/* battery-backed RAM the frontend keeps in a file (NULL if none) */
 	uint8_t *(*save_ram)(size_t *size);
+	/* a second ROM the system can do without (the Loopy's sound samples), NULL if none;
+	 * 0 and a message if the data is not it */
+	int (*load_aux)(const uint8_t *data, size_t size, char *err, size_t errn);
+	uint32_t aux_crc, aux_size;
+	const char *aux_desc;
+	const char *const *aux_names;
 } core;
 
 extern const core core_pv1000;

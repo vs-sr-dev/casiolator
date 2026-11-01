@@ -25,6 +25,7 @@
 static game s_game;
 static const core *s_core;           /* the running system, NULL on the start screen */
 static const char *s_bios_arg;       /* --bios */
+static const char *s_aux_arg;        /* --samples */
 static uint32_t s_script_pad[2];     /* scripted presses (--press) */
 
 /* ---- scripted presses: "T:name[:dur][@pad],..." ---- */
@@ -93,89 +94,134 @@ static void report(const char *fmt, ...)
 	fprintf(stderr, "%s\n", msg);
 }
 
-/* the window asks for a BIOS file (NULL headless): 1 and the path, 0 if cancelled */
+/* the window asks for a ROM file (NULL headless): 1 and the path, 0 if cancelled */
 static int (*s_ask_bios)(const core *c, const char *why, char *out, size_t n);
 static const core *s_bios_core;      /* the system whose BIOS is loaded */
+static const core *s_aux_core;       /* the system whose second ROM was looked for */
 
-static int try_bios(const core *c, const char *path, char *err, size_t errn)
+/* a ROM a system needs besides the game: the BIOS, or the second ROM (aux) */
+typedef struct
+{
+	uint32_t crc, size;
+	const char *desc;
+	const char *const *names;
+	int (*load)(const uint8_t *data, size_t size, char *err, size_t errn);
+	const char *arg;                 /* given on the command line */
+	char *remember;                  /* the setting that keeps the choice */
+	size_t remember_n;
+} rom_need;
+
+static int try_rom(const rom_need *r, const char *path, char *err, size_t errn)
 {
 	uint8_t *b;
 	size_t n;
-	const int r = bios_open(path, c->bios_crc, c->bios_size, &b, &n, err, errn);
-	if (!r)
+	const int res = bios_open(path, r->crc, r->size, &b, &n, err, errn);
+	if (!res)
 		return 0;
-	const int ok = c->load_bios(b, n, err, errn);
+	const int ok = r->load(b, n, err, errn);
 	free(b);
-	if (ok && r == 2)
-		report("%s: not the known BIOS dump (CRC differs), trying it anyway", path);
+	if (ok && res == 2)
+		report("%s: not the known dump (CRC differs), trying it anyway", path);
 	return ok;
 }
 
-/* load the system's BIOS: --bios, the remembered file, the usual names beside the
- * executable or the game, and last the user (once; the choice is remembered) */
-static int ensure_bios(const core *c, const char *game_path, char *err, size_t errn)
+/* a path's folder ("." if it has none, ".." for ".") */
+static void strip_name(char *path, size_t n)
 {
-	if (!c->load_bios || s_bios_core == c)
-		return 1;
-	char dir[1024], gdir[1024], p[2200], e2[512];
-	if (s_bios_arg)
-	{
-		if (!try_bios(c, s_bios_arg, err, errn))
-			return 0;
-		s_bios_core = c;
-		return 1;
-	}
-	if (g_config.loopy_bios[0] && try_bios(c, g_config.loopy_bios, e2, sizeof(e2)))
-	{
-		s_bios_core = c;
-		return 1;
-	}
-	os_exe_dir(dir, sizeof(dir));
-	snprintf(gdir, sizeof(gdir), "%s", game_path);
 	char *slash = NULL;
-	for (char *q = gdir; *q; q++)
+	for (char *q = path; *q; q++)
 		if (*q == '/' || *q == '\\')
 			slash = q;
 	if (slash)
 		*slash = 0;
 	else
-		snprintf(gdir, sizeof(gdir), ".");
-	const char *const dirs[] = { dir, gdir };
-	for (int d = 0; d < 2; d++)
-		for (int k = 0; c->bios_names[k]; k++)
+		snprintf(path, n, strcmp(path, ".") ? "." : "..");
+}
+
+/* the command line, the remembered file, the usual names beside the executable, the game
+ * or the BIOS, and last the user (the choice is remembered) */
+static int find_rom(const core *c, const rom_need *r, const char *game_path, char *err, size_t errn)
+{
+	char dirs[4][1024], p[2200], e2[512];
+	if (r->arg)
+		return try_rom(r, r->arg, err, errn);
+	if (r->remember[0] && try_rom(r, r->remember, e2, sizeof(e2)))
+		return 1;
+	/* beside the executable, the game, the game's folder (a game on two chips is a folder
+	 * of its own) and the BIOS */
+	os_exe_dir(dirs[0], sizeof(dirs[0]));
+	snprintf(dirs[1], sizeof(dirs[1]), "%s", game_path);
+	strip_name(dirs[1], sizeof(dirs[1]));
+	snprintf(dirs[2], sizeof(dirs[2]), "%s", dirs[1]);
+	strip_name(dirs[2], sizeof(dirs[2]));
+	snprintf(dirs[3], sizeof(dirs[3]), "%s", g_config.loopy_bios);
+	strip_name(dirs[3], sizeof(dirs[3]));
+	for (int d = 0; d < 4; d++)
+		for (int k = 0; r->names[k]; k++)
 		{
-			snprintf(p, sizeof(p), "%s/%s", dirs[d], c->bios_names[k]);
+			snprintf(p, sizeof(p), "%.1000s/%s", dirs[d], r->names[k]);
 			FILE *f = os_fopen(p, "rb");
 			if (!f)
 				continue;
 			fclose(f);
-			if (try_bios(c, p, e2, sizeof(e2)))
+			if (try_rom(r, p, e2, sizeof(e2)))
 			{
-				snprintf(g_config.loopy_bios, sizeof(g_config.loopy_bios), "%.1000s", p);
-				s_bios_core = c;
+				snprintf(r->remember, r->remember_n, "%.1000s", p);
 				return 1;
 			}
 		}
 	if (!s_ask_bios)
 	{
-		snprintf(err, errn, "%s needs its BIOS: use --bios", c->name);
+		snprintf(err, errn, "%s: file not found", c->name);
 		return 0;
 	}
-	const char *why = c->bios_desc;
+	const char *why = r->desc;
 	for (;;)
 	{
 		if (!s_ask_bios(c, why, p, sizeof(p)))
 		{
-			snprintf(err, errn, "%s needs its BIOS", c->name);
+			snprintf(err, errn, "%s: no file chosen", c->name);
 			return 0;
 		}
-		if (try_bios(c, p, e2, sizeof(e2)))
+		if (try_rom(r, p, e2, sizeof(e2)))
 			break;
 		why = e2;
 	}
-	snprintf(g_config.loopy_bios, sizeof(g_config.loopy_bios), "%.1000s", p);
+	snprintf(r->remember, r->remember_n, "%.1000s", p);
+	return 1;
+}
+
+/* the system's BIOS, which it cannot do without */
+static int ensure_bios(const core *c, const char *game_path, char *err, size_t errn)
+{
+	if (!c->load_bios || s_bios_core == c)
+		return 1;
+	const rom_need r = { c->bios_crc, c->bios_size, c->bios_desc, c->bios_names, c->load_bios,
+		s_bios_arg, g_config.loopy_bios, sizeof(g_config.loopy_bios) };
+	if (!find_rom(c, &r, game_path, err, errn))
+	{
+		if (!s_bios_arg && !s_ask_bios)
+			snprintf(err, errn, "%s needs its BIOS: use --bios", c->name);
+		return 0;
+	}
 	s_bios_core = c;
 	return 1;
+}
+
+/* the second ROM: looked for once; without it the system still runs (a message says so) */
+static void ensure_aux(const core *c, const char *game_path)
+{
+	if (!c->load_aux || s_aux_core == c)
+		return;
+	s_aux_core = c;
+	char err[512];
+	const rom_need r = { c->aux_crc, c->aux_size, c->aux_desc, c->aux_names, c->load_aux,
+		s_aux_arg, g_config.loopy_sound, sizeof(g_config.loopy_sound) };
+	if (!find_rom(c, &r, game_path, err, sizeof(err)))
+	{
+		report("%s", c->aux_desc);
+		report("%s", err);
+	}
 }
 
 /* ---- battery saves: saves/<title>.sav beside the executable ---- */
@@ -240,6 +286,7 @@ static int load_game(const char *path, char *err, size_t errn)
 		game_free(&g);
 		return 0;
 	}
+	ensure_aux(g.sys, path);
 	save_flush();                        /* the game being left, before the core is reused */
 	if (!g.sys->load(g.data, g.size, err, errn))
 	{
@@ -253,15 +300,15 @@ static int load_game(const char *path, char *err, size_t errn)
 	return 1;
 }
 
-static void write_wav_header(FILE *f, uint32_t rate, uint32_t samples)
+static void write_wav_header(FILE *f, uint32_t rate, int ch, uint32_t frames)
 {
 	uint8_t h[44];
-	uint32_t data = samples * 2;
+	uint32_t data = frames * 2 * ch;
 	memcpy(h, "RIFF", 4);
 	uint32_t v[] = { 36 + data };
 	memcpy(h + 4, v, 4);
 	memcpy(h + 8, "WAVEfmt ", 8);
-	uint32_t fmt[] = { 16, 1 | (1 << 16), rate, rate * 2, 2 | (16 << 16) };
+	uint32_t fmt[] = { 16, 1 | (uint32_t)ch << 16, rate, rate * 2 * ch, 2 * ch | (16 << 16) };
 	memcpy(h + 16, fmt, 20);
 	memcpy(h + 36, "data", 4);
 	memcpy(h + 40, &data, 4);
@@ -279,9 +326,10 @@ static int run_headless(long frames, const char *shot, const char *wav)
 		report("cannot write %s", wav);
 		return 1;
 	}
+	const int ch = s_core->audio_channels;
 	if (wf)
-		write_wav_header(wf, (uint32_t)(s_core->audio_rate + 0.5), 0);
-	int16_t abuf[4096];
+		write_wav_header(wf, (uint32_t)(s_core->audio_rate + 0.5), ch, 0);
+	int16_t abuf[8192];
 	for (long f = 0; f < frames; f++)
 	{
 		press_update(f / s_core->fps);
@@ -290,12 +338,12 @@ static int run_headless(long frames, const char *shot, const char *wav)
 		s_core->run_frame();
 		for (int n; (n = s_core->audio_take(abuf, 4096)) > 0; wn += n)
 			if (wf)
-				fwrite(abuf, 2, n, wf);
+				fwrite(abuf, 2 * ch, n, wf);
 	}
 	if (wf)
 	{
 		fseek(wf, 0, SEEK_SET);
-		write_wav_header(wf, (uint32_t)(s_core->audio_rate + 0.5), wn);
+		write_wav_header(wf, (uint32_t)(s_core->audio_rate + 0.5), ch, wn);
 		fclose(wf);
 	}
 	save_flush();
@@ -544,29 +592,31 @@ static void controller_removed(SDL_JoystickID id)
 		}
 }
 
-/* ---- sound: the core's rate to 48 kHz, linear interpolation ---- */
+/* ---- sound: the core's rate to 48 kHz stereo, linear interpolation ---- */
 
 static double s_rs_pos;
-static int16_t s_rs_prev;
+static int s_rs_prev[2];
 
 static void queue_audio(void)
 {
-	static int16_t in[4096], out[16384];
+	static int16_t in[8192], out[16384];
 	const double step = s_core->audio_rate / OUT_RATE;
-	const int gain = g_config.volume;
+	const int gain = g_config.volume, ch = s_core->audio_channels;
 	for (int n; (n = s_core->audio_take(in, 4096)) > 0; )
 	{
 		int o = 0;
 		for (int i = 0; i < n; i++)
 		{
-			const int cur = in[i];
+			const int l = in[i * ch], r = in[i * ch + ch - 1];
 			while (s_rs_pos < 1.0 && o < 16384)
 			{
-				out[o++] = (int16_t)((s_rs_prev + (cur - s_rs_prev) * s_rs_pos) * gain / 100);
+				out[o++] = (int16_t)((s_rs_prev[0] + (l - s_rs_prev[0]) * s_rs_pos) * gain / 100);
+				out[o++] = (int16_t)((s_rs_prev[1] + (r - s_rs_prev[1]) * s_rs_pos) * gain / 100);
 				s_rs_pos += step;
 			}
 			s_rs_pos -= 1.0;
-			s_rs_prev = (int16_t)cur;
+			s_rs_prev[0] = l;
+			s_rs_prev[1] = r;
 		}
 		if (s_audio)
 			SDL_QueueAudio(s_audio, out, o * 2);
@@ -707,7 +757,7 @@ static int run_window(int fullscreen, const char *path)
 	SDL_AudioSpec want = { 0 }, have;
 	want.freq = OUT_RATE;
 	want.format = AUDIO_S16SYS;
-	want.channels = 1;
+	want.channels = 2;
 	want.samples = 512;
 	s_audio = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
 	if (s_audio)
@@ -771,7 +821,7 @@ static int run_window(int fullscreen, const char *path)
 			if (s_audio)
 			{
 				/* the sound card is the clock: emulate until 50 ms of sound wait in the queue */
-				const uint32_t low = OUT_RATE * 2 * 50 / 1000;
+				const uint32_t low = OUT_RATE * 4 * 50 / 1000;   /* 16-bit stereo */
 				for (int i = 0; i < 6 && SDL_GetQueuedAudioSize(s_audio) < low; i++)
 				{
 					s_core->run_frame();
@@ -828,6 +878,8 @@ static void usage(void)
 		"  --frames N         stop after N frames\n"
 		"  --screenshot F     PNG of the last frame (headless)\n"
 		"  --wav F            the sound (headless)\n"
+		"  --bios F           the system's BIOS (Loopy: hd6437021.lsi302 or casloopy.zip)\n"
+		"  --samples F        the Loopy's sound sample ROM (hn62434fa.lsi352 or casloopy.zip)\n"
 		"  --press SPEC       scripted presses, \"T:button[:dur][@pad],...\" (T, dur in seconds)\n"
 		"                     buttons: up down left right a b c d l r start select\n");
 }
@@ -847,6 +899,7 @@ int main(int argc, char **argv)
 		else if (!strcmp(a, "--screenshot") && i + 1 < argc) shot = argv[++i];
 		else if (!strcmp(a, "--wav") && i + 1 < argc) wav = argv[++i];
 		else if (!strcmp(a, "--bios") && i + 1 < argc) s_bios_arg = argv[++i];
+		else if (!strcmp(a, "--samples") && i + 1 < argc) s_aux_arg = argv[++i];
 		else if (!strcmp(a, "--press") && i + 1 < argc)
 		{
 			if (!press_parse(argv[++i]))

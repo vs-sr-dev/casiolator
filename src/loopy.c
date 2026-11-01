@@ -16,12 +16,14 @@
 #include <stddef.h>
 #include "core.h"
 #include "loopy.h"
+#include "upd937.h"
 
 #define VDP_LINE      1365
 #define VDP_LINES     263
 #define CPU_NUM       2000000ull     /* CPU cycles = VDP cycles * CPU_NUM / CPU_DEN */
 #define CPU_DEN       2684659ull
 #define BIOS_SIZE     0x8000
+#define SOUND_CRC     0x8f51fa17
 #define DRAM_SIZE     0x80000
 
 static struct
@@ -44,8 +46,13 @@ static struct
 	uint32_t pad[2];
 	int trace;                   /* instructions left to print */
 	int log;
-	int16_t abuf[4096];
-	int alen;
+
+	upd937 snd;
+	uint8_t snd_rom[UPD937_ROM];
+	int have_snd;
+	uint64_t snd_frames;         /* sound frames made since power-on */
+	int16_t abuf[16384];         /* stereo */
+	int alen;                    /* frames in abuf */
 } L;
 
 /* CL_MIDI=file: what goes to the sound chip, with the time in seconds */
@@ -74,6 +81,32 @@ static int vcount(void)
 	const int line = (int)((vdp_now() - L.frame_vdp) / VDP_LINE);
 	const int top = L.v.height == 240 ? 23 : 39;
 	return (line - top) & 0x1ff;
+}
+
+/* ---- sound: the synthesizer runs behind the CPU and catches up when it is told something ---- */
+
+static void snd_sync(void)
+{
+	/* frames = CPU cycles * (21725000 / 256) / 16000000 */
+	const uint64_t want = L.cyc * 21725 / 4096000;
+	while (L.snd_frames < want)
+	{
+		const int room = (int)(sizeof(L.abuf) / sizeof(L.abuf[0]) / 2) - L.alen;
+		uint64_t n = want - L.snd_frames;
+		if ((int)n > room)
+			n = room;
+		if (n == 0)
+		{
+			L.snd_frames = want;                /* nobody takes the sound: drop it */
+			break;
+		}
+		if (L.have_snd)
+			upd937_render(&L.snd, L.abuf + L.alen * 2, (int)n);
+		else
+			memset(L.abuf + L.alen * 2, 0, n * 4);
+		L.alen += (int)n;
+		L.snd_frames += n;
+	}
 }
 
 /* ---- VDP and MMIO (area 4) ---- */
@@ -195,6 +228,8 @@ static void vdp_w16(uint32_t a, uint16_t d)
 	else if (o >= 0x80000 && o < 0xa0000)
 	{
 		v->sound_ctrl = d;
+		snd_sync();
+		upd937_ctrl(&L.snd, d);
 		if (s_midi_log)
 			fprintf(s_midi_log, "%.6f ctrl %04x\n", L.cyc / 16e6, d);
 	}
@@ -359,6 +394,11 @@ static void sci_tx(void *c, int ch, uint8_t b)
 		fprintf(stderr, "sci%d: %02x\n", ch, b);
 	if (s_midi_log && ch == 1)
 		fprintf(s_midi_log, "%.6f %02x\n", L.cyc / 16e6, b);
+	if (ch == 1)
+	{
+		snd_sync();
+		upd937_midi(&L.snd, b);
+	}
 }
 
 /* ---- run ---- */
@@ -466,16 +506,7 @@ static void lp_run_frame(void)
 	if (L.log)
 		fprintf(stderr, "frame end: pc %08x sr %03x vbr %08x\n", L.cpu.pc, L.cpu.sr, L.cpu.vbr);
 
-	/* silence until the sound chip is in: 32 kHz, carrying the fraction over */
-	static double frac;
-	frac += 32000.0 * VDP_LINE * VDP_LINES / 21477272.0;
-	int n = (int)frac;
-	frac -= n;
-	if (L.alen + n <= (int)(sizeof(L.abuf) / sizeof(L.abuf[0])))
-	{
-		memset(L.abuf + L.alen, 0, n * sizeof(int16_t));
-		L.alen += n;
-	}
+	snd_sync();
 }
 
 static void lp_reset(void)
@@ -504,6 +535,7 @@ static void lp_reset(void)
 	L.cpu.irq_ack = cpu_ack;
 	sh1_reset(&L.cpu);
 	L.next_per = 0;
+	upd937_init(&L.snd, L.snd_rom);
 }
 
 static int lp_load_bios(const uint8_t *data, size_t size, char *err, size_t errn)
@@ -542,6 +574,7 @@ static int lp_load(const uint8_t *rom, size_t size, char *err, size_t errn)
 	L.cyc = 0;
 	L.frame_vdp = 0;
 	L.alen = 0;
+	L.snd_frames = 0;
 	const char *t = getenv("CL_TRACE");
 	L.trace = t ? atoi(t) : 0;
 	L.log = getenv("CL_LOG") != NULL;
@@ -551,6 +584,11 @@ static int lp_load(const uint8_t *rom, size_t size, char *err, size_t errn)
 	return 1;
 }
 
+static const char *const s_sound_names[] = {
+	"hn62434fa.lsi352", "casloopy.zip", "bios/hn62434fa.lsi352", "bios/casloopy.zip",
+	"loopy_sound.bin", "[BIOS] Internal Thermal Printer (Japan).bin", NULL
+};
+
 static const uint32_t *lp_framebuffer(void)
 {
 	return L.v.fb;
@@ -559,10 +597,22 @@ static const uint32_t *lp_framebuffer(void)
 static int lp_audio_take(int16_t *out, int max)
 {
 	int n = L.alen < max ? L.alen : max;
-	memcpy(out, L.abuf, n * sizeof(int16_t));
-	memmove(L.abuf, L.abuf + n, (L.alen - n) * sizeof(int16_t));
+	memcpy(out, L.abuf, n * 4);
+	memmove(L.abuf, L.abuf + n * 2, (L.alen - n) * 4);
 	L.alen -= n;
 	return n;
+}
+
+static int lp_load_sound(const uint8_t *data, size_t size, char *err, size_t errn)
+{
+	if (size != UPD937_ROM)
+	{
+		snprintf(err, errn, "the Loopy's sound samples are a 512 KB ROM (HN62434FA)");
+		return 0;
+	}
+	memcpy(L.snd_rom, data, UPD937_ROM);
+	L.have_snd = 1;
+	return 1;
 }
 
 static void lp_set_pad(int pad, uint32_t buttons)
@@ -586,7 +636,7 @@ const core core_loopy = {
 	LOOPY_W, 224,
 	4.0 / 3.0,
 	21477272.0 / (VDP_LINE * VDP_LINES),
-	32000.0,
+	UPD937_RATE, 2,
 	lp_load, lp_reset, lp_run_frame, lp_framebuffer, lp_audio_take, lp_set_pad,
 	lp_load_bios,
 	0x8c57ff9f, BIOS_SIZE,
@@ -594,4 +644,10 @@ const core core_loopy = {
 	"\"hd6437021.lsi302\"). Choose that file, or a zip with it such as MAME's casloopy.zip.",
 	s_bios_names,
 	lp_save_ram,
+	lp_load_sound,
+	SOUND_CRC, UPD937_ROM,
+	"The Casio Loopy's music comes from a 512 KB sample ROM (HN62434FA, \"hn62434fa.lsi352\", "
+	"in MAME's casloopy.zip; No-Intro calls it \"[BIOS] Internal Thermal Printer\"). "
+	"Without it the games are silent.",
+	s_sound_names,
 };

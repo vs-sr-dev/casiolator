@@ -379,8 +379,9 @@ const core core_pv1000 = {
 	FB_W, FB_H,
 	FB_W * 48.0 / 35.0 / FB_H,           /* pixel aspect 48:35 */
 	(double)MASTER / FRAME_MC,
-	(double)MASTER / SND_MC,
+	(double)MASTER / SND_MC, 1,
 	pv_load, pv_reset, pv_run_frame, pv_framebuffer, pv_audio_take, pv_set_pad,
 	NULL, 0, 0, NULL, NULL,                  /* no BIOS */
 	NULL,                                    /* no battery RAM */
+	NULL, 0, 0, NULL, NULL,                  /* no second ROM */
 };

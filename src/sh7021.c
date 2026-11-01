@@ -138,17 +138,21 @@ static void dma_unit(sh7021 *s, dma_ch *d)
 {
 	const int word = (d->chcr >> 3) & 1, size = word ? 2 : 1;
 	const int sm = (d->chcr >> 12) & 3, dm = (d->chcr >> 14) & 3;
-	if (word)
-		s->bus_w16(s->ctx, d->dar, s->bus_r16(s->ctx, d->sar));
-	else
-		s->bus_w8(s->ctx, d->dar, s->bus_r8(s->ctx, d->sar));
-	s->dma_cycles += s->bus_cost(s->ctx, d->sar) + s->bus_cost(s->ctx, d->dar);
+	const uint32_t sar = d->sar, dar = d->dar;
+	const uint16_t v = word ? s->bus_r16(s->ctx, sar) : s->bus_r8(s->ctx, sar);
+	s->dma_cycles += s->bus_cost(s->ctx, sar) + s->bus_cost(s->ctx, dar);
+	/* the channel moves on before the write: writing SCI TDR can ask for the next
+	 * transfer at once (sci_start), which must see the next address */
 	if (sm == 1) d->sar += size;
 	else if (sm == 2) d->sar -= size;
 	if (dm == 1) d->dar += size;
 	else if (dm == 2) d->dar -= size;
 	if (--d->tcr == 0)
 		d->chcr |= 2;                           /* TE */
+	if (word)
+		s->bus_w16(s->ctx, dar, v);
+	else
+		s->bus_w8(s->ctx, dar, (uint8_t)v);
 }
 
 static int dma_active(sh7021 *s, dma_ch *d)

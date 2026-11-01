@@ -9,15 +9,18 @@ Status:
 | System | |
 |-|-|
 | PV-1000 | all 13 games play, with sound |
-| Loopy | all 12 cartridges start and respond; no sound yet (in progress), no printer, no mouse |
+| Loopy | all 12 cartridges start and respond, with music (first version); no printer, no mouse |
 
 Casiolator does not come with any game or BIOS: bring your own dumps.
 
 The Loopy needs its BIOS: the 32 KB ROM inside the CPU (`hd6437021.lsi302`, also inside
 MAME's `casloopy.zip`). Casiolator looks for it beside the executable (also in a `bios`
 folder) and beside the game; otherwise the first Loopy game you open asks for it once.
-Note that the 512 KB file some sets call "[BIOS] Internal Thermal Printer" is not it: that
-is the sound chip's sample ROM.
+
+For the music it also needs the sound chip's 512 KB sample ROM (`hn62434fa.lsi352`, also in
+MAME's `casloopy.zip`; the No-Intro set calls it "[BIOS] Internal Thermal Printer", which
+it is not). It is looked for in the same places and beside the BIOS, then asked for once;
+without it the games run silent.
 
 ## Use
 

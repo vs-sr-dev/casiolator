@@ -5,3 +5,4 @@ dist/
 screenshots/
 *.ini
 refs/
+tests/loopy_soundtest/*.elf
