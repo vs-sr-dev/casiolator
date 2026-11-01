@@ -156,9 +156,14 @@ static int dma_active(sh7021 *s, dma_ch *d)
 	return (s->dmaor & 1) && !(s->dmaor & 6) && (d->chcr & 3) == 1;
 }
 
-/* auto-request channels run to the end as soon as they are enabled */
+static void sci_start(sh7021 *s, int ch);
+
+/* auto-request channels run to the end as soon as they are enabled; a channel on TXI
+ * starts if the transmitter is already waiting */
 static void dma_check(sh7021 *s)
 {
+	sci_start(s, 0);
+	sci_start(s, 1);
 	for (int i = 0; i < 4; i++)
 	{
 		dma_ch *d = &s->dma[i];
@@ -171,15 +176,20 @@ static void dma_check(sh7021 *s)
 	update_irq(s);
 }
 
-/* a peripheral asked for one transfer (RS code) */
-static void dma_request(sh7021 *s, int rs)
+/* a peripheral asked for one transfer (RS code); 1 if a channel took it */
+static int dma_request(sh7021 *s, int rs)
 {
+	int done = 0;
 	for (int i = 0; i < 4; i++)
 	{
 		dma_ch *d = &s->dma[i];
 		if (dma_active(s, d) && ((d->chcr >> 8) & 15) == rs)
+		{
 			dma_unit(s, d);
+			done = 1;
+		}
 	}
+	return done;
 }
 
 /* ---- ITU ---- */
@@ -205,47 +215,53 @@ static void itu_flag(sh7021 *s, int ch, int bit)
 {
 	itu_ch *t = &s->itu[ch];
 	t->tsr |= bit;
-	if (bit == 1 && ch < 4)
-		dma_request(s, 8 + ch);                 /* IMIA0-3 can start a DMA transfer */
+	/* IMIA0-3 with IMIEA set can start a DMA transfer, which clears IMFA */
+	if (bit == 1 && ch < 4 && (t->tier & 1) && dma_request(s, 8 + ch))
+		t->tsr &= ~1;
 }
 
-/* count n times */
+/* the counter steps n times. A compare match flag is set as the counter leaves the
+ * matching value (manual 10.4: "in the last state in which the values match"); at the
+ * clearing value it goes back to 0, and leaving 0xffff is an overflow */
 static void itu_count(sh7021 *s, int ch, uint32_t n)
 {
 	itu_ch *t = &s->itu[ch];
 	while (n)
 	{
 		const uint16_t top = itu_top(t) >= t->tcnt ? itu_top(t) : 0xffff;
-		if (t->tcnt == top)
+		uint32_t d = (uint32_t)(top - t->tcnt) + 1;
+		if (t->gra >= t->tcnt && (uint32_t)(t->gra - t->tcnt) + 1 < d) d = (uint32_t)(t->gra - t->tcnt) + 1;
+		if (t->grb >= t->tcnt && (uint32_t)(t->grb - t->tcnt) + 1 < d) d = (uint32_t)(t->grb - t->tcnt) + 1;
+		if (d > n)
+		{
+			t->tcnt += (uint16_t)n;
+			return;
+		}
+		n -= d;
+		const uint16_t left = (uint16_t)(t->tcnt + d - 1);
+		if (left == t->gra) itu_flag(s, ch, 1);
+		if (left == t->grb) itu_flag(s, ch, 2);
+		if (left == top)
 		{
 			t->tcnt = 0;
-			n--;
 			if (top == 0xffff)
-				itu_flag(s, ch, 4);             /* OVF */
-			if (t->gra == 0) itu_flag(s, ch, 1);
-			if (t->grb == 0) itu_flag(s, ch, 2);
-			continue;
+				itu_flag(s, ch, 4);
 		}
-		uint32_t d = top - t->tcnt;
-		if (t->gra > t->tcnt && (uint32_t)(t->gra - t->tcnt) < d) d = t->gra - t->tcnt;
-		if (t->grb > t->tcnt && (uint32_t)(t->grb - t->tcnt) < d) d = t->grb - t->tcnt;
-		if (d > n)
-			d = n;
-		t->tcnt += (uint16_t)d;
-		n -= d;
-		if (t->tcnt == t->gra) itu_flag(s, ch, 1);
-		if (t->tcnt == t->grb) itu_flag(s, ch, 2);
+		else
+			t->tcnt = (uint16_t)(left + 1);
 	}
 }
 
-/* counts until the next flag of a channel (0 if none can come) */
+/* counts until the next flag of a channel */
 static uint32_t itu_until_flag(const itu_ch *t)
 {
 	const uint16_t top = itu_top(t) >= t->tcnt ? itu_top(t) : 0xffff;
-	uint32_t d = top == t->tcnt ? 1 : (uint32_t)(top - t->tcnt) + (top == 0xffff ? 1 : 0);
-	if (t->gra > t->tcnt && (uint32_t)(t->gra - t->tcnt) < d) d = t->gra - t->tcnt;
-	if (t->grb > t->tcnt && (uint32_t)(t->grb - t->tcnt) < d) d = t->grb - t->tcnt;
-	return d ? d : 1;
+	uint32_t d = top == 0xffff ? (uint32_t)(0xffff - t->tcnt) + 1 : 0x20000;
+	if (t->gra >= t->tcnt && (uint32_t)(t->gra - t->tcnt) + 1 < d) d = (uint32_t)(t->gra - t->tcnt) + 1;
+	if (t->grb >= t->tcnt && (uint32_t)(t->grb - t->tcnt) + 1 < d) d = (uint32_t)(t->grb - t->tcnt) + 1;
+	if (d == 0x20000)
+		d = (uint32_t)(top - t->tcnt) + 1;     /* cleared before any flag: look again from 0 */
+	return d;
 }
 
 static void itu_sync(sh7021 *s)
@@ -274,10 +290,23 @@ static uint32_t sci_frame(const sci_ch *c)
 	return (uint32_t)bits * (32u << (2 * (c->smr & 3))) * (c->brr + 1u);
 }
 
+/* TDR empty with TXI enabled: a DMA channel on TXI fills it (and clears TDRE, 15.3.2) */
+static void sci_txi_dma(sh7021 *s, int ch)
+{
+	sci_ch *c = &s->sci[ch];
+	if (!(c->ssr & 0x80) || (c->scr & 0xa0) != 0xa0)
+		return;
+	/* cleared first: the TDR write below comes back through sci_start */
+	c->ssr &= ~0x80;
+	if (!dma_request(s, ch ? 7 : 5))
+		c->ssr |= 0x80;
+}
+
 /* shift register empty and a byte waiting: start sending it */
 static void sci_start(sh7021 *s, int ch)
 {
 	sci_ch *c = &s->sci[ch];
+	sci_txi_dma(s, ch);
 	if (c->tx_busy || (c->ssr & 0x80) || !(c->scr & 0x20))
 		return;
 	c->tsr = c->tdr;
@@ -285,7 +314,7 @@ static void sci_start(sh7021 *s, int ch)
 	c->tx_done = s->now + sci_frame(c);
 	c->ssr |= 0x80;                             /* TDRE: the data register is free again */
 	c->ssr &= ~0x04;
-	dma_request(s, ch ? 7 : 5);                 /* TXI can feed a DMA channel */
+	sci_txi_dma(s, ch);
 }
 
 static void sci_sync(sh7021 *s)
