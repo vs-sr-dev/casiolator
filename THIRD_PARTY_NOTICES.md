@@ -7,6 +7,11 @@ Casiolator's code is its own; what it knows about the hardware comes from:
 - **PV-1000**: MAME's `pv1000.cpp` driver (BSD-3-Clause; Wilbert Pol, with plgDavid's
   sound and timing analysis and lidnariq's test ROMs), used as documentation for the
   memory map, the video chip's bus timing, the interrupts and the sound mixer.
+- **PV-2000**: MAME's `pv2000.cpp` driver (BSD-3-Clause; Wilbert Pol, anondumper), used
+  as documentation for the memory map, the I/O ports, the keyboard matrix and the
+  interrupts. The TMS9918A video and SN76489A sound follow Texas Instruments' data
+  manuals; the A part's noise register (17 bits, taps 2 and 3) is as MAME's `sn76496.cpp`
+  describes it.
 - **Loopy**: kasami's Casio Loopy Hardware Megadoc, Loopy-Tools documentation (ROM header,
   music track format and the sound chip's MIDI subset) and Loopy-Schematics (the audio
   output filter); Hitachi's SH-1 programming and SH7020/SH7021 hardware manuals. The sound

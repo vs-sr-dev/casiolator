@@ -42,6 +42,7 @@ int config_load(void)
 		const char *key = trim(s), *val = trim(eq + 1);
 		if (!strcmp(key, "game_folder")) snprintf(g_config.game_dir, sizeof(g_config.game_dir), "%s", val);
 		else if (!strcmp(key, "loopy_bios")) snprintf(g_config.loopy_bios, sizeof(g_config.loopy_bios), "%s", val);
+		else if (!strcmp(key, "pv2000_bios")) snprintf(g_config.pv2000_bios, sizeof(g_config.pv2000_bios), "%s", val);
 		else if (!strcmp(key, "loopy_sound")) snprintf(g_config.loopy_sound, sizeof(g_config.loopy_sound), "%s", val);
 		else if (!strcmp(key, "volume")) g_config.volume = clamp(atoi(val), 0, 100);
 		else if (!strcmp(key, "scale")) g_config.scale = clamp(atoi(val), 1, 8);
@@ -60,6 +61,7 @@ int config_save(void)
 	fprintf(f, "game_folder = %s\n", g_config.game_dir);
 	fprintf(f, "loopy_bios = %s\n", g_config.loopy_bios);
 	fprintf(f, "loopy_sound = %s\n", g_config.loopy_sound);
+	fprintf(f, "pv2000_bios = %s\n", g_config.pv2000_bios);
 	fprintf(f, "volume = %d\n", g_config.volume);
 	fprintf(f, "scale = %d\n", g_config.scale);
 	return fclose(f) == 0;

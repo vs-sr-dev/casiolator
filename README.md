@@ -1,7 +1,7 @@
 # Casiolator
 
-An emulator for Casio's two cartridge consoles, the **PV-1000** (1983) and the **Loopy**
-(1995), made to be easy: open it, drop a cartridge on the window, play. No configuration
+An emulator for Casio's cartridge machines, the **PV-1000** (1983) and **PV-2000** (1983)
+and the **Loopy** (1995), made to be easy: open it, drop a cartridge on the window, play. No configuration
 files to edit, no frontend to set up, controllers work as soon as they are plugged in.
 
 Status:
@@ -9,6 +9,7 @@ Status:
 | System | |
 |-|-|
 | PV-1000 | all 13 games play, with sound |
+| PV-2000 | the 10 cartridges play, with sound; no BASIC keyboard, no cassette |
 | Loopy | all 12 cartridges start and respond, with music (first version); no printer, no mouse |
 
 Casiolator does not come with any game or BIOS: bring your own dumps.
@@ -17,7 +18,11 @@ The Loopy needs its BIOS: the 32 KB ROM inside the CPU (`hd6437021.lsi302`, also
 MAME's `casloopy.zip`). Casiolator looks for it beside the executable (also in a `bios`
 folder) and beside the game; otherwise the first Loopy game you open asks for it once.
 
-For the music it also needs the sound chip's 512 KB sample ROM (`hn62434fa.lsi352`, also in
+The PV-2000 needs its BIOS too: the 16 KB ROM `hn613128pc64.bin` (also inside MAME's
+`pv2000.zip`), looked for and asked for in the same way. Its cartridges are told apart
+from the PV-1000's by their first instruction.
+
+For the Loopy's music Casiolator also needs the sound chip's 512 KB sample ROM (`hn62434fa.lsi352`, also in
 MAME's `casloopy.zip`; the No-Intro set calls it "[BIOS] Internal Thermal Printer", which
 it is not). It is looked for in the same places and beside the BIOS, then asked for once;
 without it the games run silent.
@@ -56,6 +61,17 @@ player 1.
 | select | Right Shift, Backspace | Back / Select |
 
 Two-player PV-1000 games start with Select, then Start.
+
+| PV-2000 | Keyboard | Controller |
+|-|-|-|
+| joystick | arrows | d-pad, left stick |
+| button 1, 2 | Z, X | A, B |
+| START (and RETURN) | Enter | Start |
+| SELECT | Right Shift, Backspace | Back / Select |
+
+The PV-2000's joystick and buttons are keys of its keyboard; the games only use those.
+Start presses the machine's START and RETURN together, since the games ask for either
+(Rakugaki only for RETURN). The second player's keys are a guess.
 
 | Loopy | Keyboard | Controller |
 |-|-|-|

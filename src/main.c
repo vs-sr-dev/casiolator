@@ -1,4 +1,4 @@
-/* Casiolator - Casio PV-1000 and Loopy emulator: command line, window, sound, input
+/* Casiolator - Casio PV-1000, PV-2000 and Loopy emulator: command line, window, sound, input
  *
  * casiolator [options] [cartridge]
  * With no cartridge the window opens on a start screen: drop a file on it or click to
@@ -138,6 +138,14 @@ static void strip_name(char *path, size_t n)
 		snprintf(path, n, strcmp(path, ".") ? "." : "..");
 }
 
+/* the setting that remembers a system's BIOS */
+static char *bios_setting(const core *c, size_t *n)
+{
+	if (c == &core_pv2000)
+		return *n = sizeof(g_config.pv2000_bios), g_config.pv2000_bios;
+	return *n = sizeof(g_config.loopy_bios), g_config.loopy_bios;
+}
+
 /* the command line, the remembered file, the usual names beside the executable, the game
  * or the BIOS, and last the user (the choice is remembered) */
 static int find_rom(const core *c, const rom_need *r, const char *game_path, char *err, size_t errn)
@@ -154,7 +162,8 @@ static int find_rom(const core *c, const rom_need *r, const char *game_path, cha
 	strip_name(dirs[1], sizeof(dirs[1]));
 	snprintf(dirs[2], sizeof(dirs[2]), "%s", dirs[1]);
 	strip_name(dirs[2], sizeof(dirs[2]));
-	snprintf(dirs[3], sizeof(dirs[3]), "%s", g_config.loopy_bios);
+	size_t bn;
+	snprintf(dirs[3], sizeof(dirs[3]), "%s", bios_setting(c, &bn));
 	strip_name(dirs[3], sizeof(dirs[3]));
 	for (int d = 0; d < 4; d++)
 		for (int k = 0; r->names[k]; k++)
@@ -196,8 +205,10 @@ static int ensure_bios(const core *c, const char *game_path, char *err, size_t e
 {
 	if (!c->load_bios || s_bios_core == c)
 		return 1;
+	size_t bn;
+	char *remember = bios_setting(c, &bn);
 	const rom_need r = { c->bios_crc, c->bios_size, c->bios_desc, c->bios_names, c->load_bios,
-		s_bios_arg, g_config.loopy_bios, sizeof(g_config.loopy_bios) };
+		s_bios_arg, remember, bn };
 	if (!find_rom(c, &r, game_path, err, errn))
 	{
 		if (!s_bios_arg && !s_ask_bios)
@@ -661,7 +672,7 @@ static int draw_overlay(void)
 	{
 		fill_rect(s_overlay, OV_W, OV_W, OV_H, 0, 0, OV_W, OV_H, 0xff10141c);
 		text_center(150, "CASIOLATOR", 0xffffd060, 4);
-		text_center(215, "Casio PV-1000 and Loopy", 0xffc0c8d8, 2);
+		text_center(215, "Casio PV-1000, PV-2000 and Loopy", 0xffc0c8d8, 2);
 		text_center(290, "Drop a cartridge on this window (.bin or .zip)", 0xffffffff, 1);
 		text_center(310, "or click anywhere to look for one", 0xffffffff, 1);
 		text_center(450, "version " CL_VERSION, 0xff607080, 1);
@@ -871,14 +882,15 @@ static int run_window(int fullscreen, const char *path)
 static void usage(void)
 {
 	printf(
-		"Casiolator " CL_VERSION " - Casio PV-1000 and Loopy emulator\n"
+		"Casiolator " CL_VERSION " - Casio PV-1000, PV-2000 and Loopy emulator\n"
 		"usage: casiolator [options] [cartridge.bin|.zip]\n"
 		"  --fullscreen       start in full screen\n"
 		"  --headless         no window, no sound (with --frames)\n"
 		"  --frames N         stop after N frames\n"
 		"  --screenshot F     PNG of the last frame (headless)\n"
 		"  --wav F            the sound (headless)\n"
-		"  --bios F           the system's BIOS (Loopy: hd6437021.lsi302 or casloopy.zip)\n"
+		"  --bios F           the system's BIOS (Loopy: hd6437021.lsi302 or casloopy.zip;\n"
+		"                     PV-2000: hn613128pc64.bin or pv2000.zip)\n"
 		"  --samples F        the Loopy's sound sample ROM (hn62434fa.lsi352 or casloopy.zip)\n"
 		"  --press SPEC       scripted presses, \"T:button[:dur][@pad],...\" (T, dur in seconds)\n"
 		"                     buttons: up down left right a b c d l r start select\n");

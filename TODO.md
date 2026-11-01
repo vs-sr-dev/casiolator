@@ -60,6 +60,16 @@
   1551 balloons (19 500), 322 sound effects, 6 names.
 - CL_WATCH=lo-hi (hex): CPU data reads in that range, with PC and PR.
 
+### Session 4 (2026-11-01)
+
+- PV-2000 (src/pv2000.c, src/tms9918.c, src/sn76489.c): the 10 cartridges of the set
+  boot and play (headless runs: scores going up, sound in all of them).
+  BIOS hn613128pc64.bin (CRC 8f31f297, from MAME's pv2000.zip) is required:
+  the cartridges call it. Told from PV-1000 carts by their first bytes (JP 0xc0xx).
+  pv2000_bios in casiolator.ini. The keyboard columns the games read (traced): 4, 6, 7,
+  8 (joystick, START/SELECT, RETURN), 5 (diagonals: Front Line, Roc'n Rope, Ski Command),
+  0 (Galaga: keys 1-4?), 3 high (Excite Mahjong: space/N/B/V as buttons?).
+
 ## Rules for the Loopy (user, 2026-11-01)
 
 Clean room, MIT. Never read LoopyMSE's or MAME's casloopy source, nor a MAME fork's
@@ -137,14 +147,13 @@ First survey (session 2):
 ### PV-1000
 - [ ] Compare with videos of the real console (colours, border, Dig Dug's stripes)
 
-### PV-2000 (after the translations; user, 2026-11-01)
-A third system: Z80 (our core), TI TMS9918A video and SN76489 sound (TI's datasheets and
-manuals), built-in keyboard, BIOS with BASIC, cartridges. Memory map, keyboard matrix and
-I/O ports from MAME's pv2000 driver used as documentation, as for the PV-1000 (credited in
-THIRD_PARTY_NOTICES; the strict clean room is for the Loopy only). To check first: the
-dumps (cartridges and BIOS: not in nointro-casio-loopy-pv-1000.zip) and which games need
-keys besides the joystick (a comfortable keyboard mapping). Estimate: one session to
-boot, one to polish (TMS9918A modes, sprites, 4 per line, collisions).
+### PV-2000
+- [ ] User play test in the window: every game, sound by ear, two players
+- [ ] Second player's matrix bits (bits 2-3 of columns 6-8) are inferred from Excite
+      Mahjong's masks: confirm with a two-player game
+- [ ] VDP: no access timing (fast writes during the active display always land), the
+      4K/16K bit is ignored, a frame is drawn line by line from each line's start state
+- [ ] BASIC with the whole keyboard (a text mode for the frontend), cassette, printer
 
 ### Frontend
 - [ ] Controls panel (remapping), as Flick's F4 panel

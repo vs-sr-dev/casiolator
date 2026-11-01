@@ -44,5 +44,6 @@ typedef struct core
 
 extern const core core_pv1000;
 extern const core core_loopy;
+extern const core core_pv2000;
 
 #endif

@@ -97,12 +97,20 @@ static void swap16(uint8_t *p, size_t n)
 static int classify(game *g, uint8_t *data, size_t size, const char *name, char *err, size_t errn)
 {
 	int swapped = 0;
+	if (size == 0x4000 && crc32_update(0, data, size) == core_pv2000.bios_crc)
+	{
+		snprintf(err, errn, "%s is the PV-2000 BIOS: keep it beside the games and open a game", name);
+		free(data);
+		return 0;
+	}
 	if (loopy_header(data, size, &swapped))
 	{
 		if (swapped)
 			swap16(data, size);
 		g->system = SYS_LOOPY;
 	}
+	else if ((size == 0x2000 || size == 0x4000) && data[0] == 0xc3 && data[2] >= 0xc0)
+		g->system = SYS_PV2000;     /* starts with a jump into its own space, 0xc000 up */
 	else if (size == 0x2000 || size == 0x4000 || size == 0x8000)
 		g->system = SYS_PV1000;
 	else if (size >= 0x80000 && size <= 0x400000 && !(size & 0xffff))
@@ -126,14 +134,14 @@ static int classify(game *g, uint8_t *data, size_t size, const char *name, char 
 	}
 	else
 	{
-		snprintf(err, errn, "%s: not a PV-1000 or Loopy cartridge (%u bytes)", name, (unsigned)size);
+		snprintf(err, errn, "%s: not a PV-1000, PV-2000 or Loopy cartridge (%u bytes)", name, (unsigned)size);
 		free(data);
 		return 0;
 	}
 	g->data = data;
 	g->size = size;
 	g->crc = crc32_update(0, data, size);
-	g->sys = g->system == SYS_PV1000 ? &core_pv1000 : &core_loopy;
+	g->sys = g->system == SYS_PV1000 ? &core_pv1000 : g->system == SYS_PV2000 ? &core_pv2000 : &core_loopy;
 	return 1;
 }
 

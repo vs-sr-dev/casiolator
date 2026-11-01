@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include "core.h"
 
-enum { SYS_NONE, SYS_PV1000, SYS_LOOPY };
+enum { SYS_NONE, SYS_PV1000, SYS_LOOPY, SYS_PV2000 };
 
 typedef struct
 {
