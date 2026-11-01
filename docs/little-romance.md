@@ -127,6 +127,15 @@ table that comes with each story: a type the story does not have is dropped (an
 effect added to the introduction panel is not drawn). Letters are drawn scaled, so
 pairs should work; to try in a story that has effects.
 
+## From the user's play (session 3)
+
+- On a panel, A opens a popup "つぎに進む" (next) with an arrow and a printer icon.
+- The six characters, with surnames: Ikeda Masumi, Himuro Naoki, Otonashi Chisato,
+  Hoshi Motoyuki, Hayami Ritsuko, Tennouji Mikio. They can be renamed (RENAME on the
+  "choose two main characters" screen), so their names are typed like the heroine's.
+- Font text on screens: the popup title, the "choose two" title (ui 0x3815e, a box of
+  about 140 pixels). The 決定 button there seems to be graphics.
+
 ## Still to do
 
 1. Translate everything (Claude translates, the user plays and reviews).
