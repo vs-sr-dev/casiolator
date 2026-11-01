@@ -46,6 +46,7 @@ static struct
 	uint32_t pad[2];
 	int trace;                   /* instructions left to print */
 	int log;
+	uint32_t watch_lo, watch_hi; /* CL_WATCH=lo-hi: CPU data reads in this range */
 
 	upd937 snd;
 	uint8_t snd_rom[UPD937_ROM];
@@ -323,11 +324,18 @@ static void w16(void *c, uint32_t a, uint16_t v)
 	}
 }
 
+static void watch(uint32_t a, int size)
+{
+	if (a >= L.watch_lo && a < L.watch_hi && a - L.cpu.pc > 4)
+		fprintf(stderr, "watch: read%d %08x at %08x pr %08x\n", size, a, L.cpu.pc, L.cpu.pr);
+}
+
 /* CPU-side accessors: also count the bus time */
 static uint8_t cpu_r8(void *c, uint32_t a)
 {
 	L.cpu.wait += cost(a) - 1;
 	L.per.now = L.cyc;
+	watch(a, 8);
 	return r8(c, a);
 }
 
@@ -335,6 +343,7 @@ static uint16_t cpu_r16(void *c, uint32_t a)
 {
 	L.cpu.wait += cost(a) - 1;
 	L.per.now = L.cyc;
+	watch(a, 16);
 	return r16(c, a);
 }
 
@@ -343,6 +352,7 @@ static uint32_t cpu_r32(void *c, uint32_t a)
 	const int ar = area(a);
 	L.cpu.wait += (ar == 0 || ar == 7 || ar == 5) ? cost(a) - 1 : 2 * cost(a) - 1;
 	L.per.now = L.cyc;
+	watch(a, 32);
 	return ((uint32_t)r16(c, a) << 16) | r16(c, a + 2);
 }
 
@@ -578,6 +588,14 @@ static int lp_load(const uint8_t *rom, size_t size, char *err, size_t errn)
 	const char *t = getenv("CL_TRACE");
 	L.trace = t ? atoi(t) : 0;
 	L.log = getenv("CL_LOG") != NULL;
+	const char *w = getenv("CL_WATCH");
+	L.watch_lo = L.watch_hi = 0;
+	if (w)
+	{
+		char *e;
+		L.watch_lo = (uint32_t)strtoul(w, &e, 16);
+		L.watch_hi = *e == '-' ? (uint32_t)strtoul(e + 1, NULL, 16) : L.watch_lo + 1;
+	}
 	if (getenv("CL_MIDI") && !s_midi_log)
 		s_midi_log = fopen(getenv("CL_MIDI"), "w");
 	lp_reset();

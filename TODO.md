@@ -50,6 +50,16 @@
   polyphony, volumes); recorded in the SR2 MAME fork as a black box
   (byte-swapped cartridge; retail games are silent there: its SCI1 does not take DMA).
 
+### Session 3 (2026-11-01)
+
+- Little Romance translation, first survey (docs/little-romance.md): No-Intro's dump is bad
+  (IC104 repeats its first megabyte; header checksum); the text engine (EUC-JP, `／`,
+  name codes, 3 x 16 message boxes), the 12x12 font and its JIS index, the manga panel
+  records (two vertical balloons and a sound effect each); all the text is reached
+  through pointers. tools/lr_text.py extracts it: 1221 strings (39 400 characters),
+  1551 balloons (19 500), 322 sound effects, 6 names.
+- CL_WATCH=lo-hi (hex): CPU data reads in that range, with PC and PR.
+
 ## Rules for the Loopy (user, 2026-11-01)
 
 Clean room, MIT. Never read LoopyMSE's or MAME's casloopy source, nor the SR2 MAME-fork
@@ -88,7 +98,21 @@ must answer like the mechanism: a seal cartridge present (SCT), the alignment ma
 ribbon colours passing the OPTO sensors as the motor steps. Collect head lines per pass,
 compose the three colour passes, write a PNG in prints/.
 
-### Translation patches
+### Little Romance in English (next)
+Plan in docs/little-romance.md. Steps:
+1. Script files in translations/ (git-ignored: no game text in the repo), from
+   lr_text.py. Claude translates, the user plays and reviews. Names in romaji, no
+   honorifics.
+2. Font: 6-pixel Latin letters, bigram glyphs, the font moved to the 4th megabyte.
+3. Inserter: encode to bigrams, wrap the message boxes (line length 16 -> 18), repoint,
+   grow the ROM to 4 MB, fix the header checksum, write a BPS patch.
+4. Balloons drawn horizontally: find the drawing routine, patch it; fit the English to
+   each balloon's width and height.
+5. Graphics with Japanese text: survey the screens, redraw.
+6. Casiolator: apply a BPS beside the game at load; warn about a dump whose header
+   checksum is wrong (No-Intro's Little Romance).
+
+### Translation patches (other games)
 Text encoding and fonts of the Loopy games (Shift-JIS? tiles?), free ROM space, an
 IPS/BPS applier at load time (patch file beside the game, the ROM never changed).
 Target language: English, for an international audience (user, 2026-11-01).
