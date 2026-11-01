@@ -99,18 +99,15 @@ ribbon colours passing the OPTO sensors as the motor steps. Collect head lines p
 compose the three colour passes, write a PNG in prints/.
 
 ### Little Romance in English (next)
-Plan in docs/little-romance.md. Steps:
-1. Script files in translations/ (git-ignored: no game text in the repo), from
-   lr_text.py. Claude translates, the user plays and reviews. Names in romaji, no
-   honorifics.
-2. Font: 6-pixel Latin letters, bigram glyphs, the font moved to the 4th megabyte.
-3. Inserter: encode to bigrams, wrap the message boxes (line length 16 -> 18), repoint,
-   grow the ROM to 4 MB, fix the header checksum, write a BPS patch.
-4. Balloons drawn horizontally: find the drawing routine, patch it; fit the English to
-   each balloon's width and height.
-5. Graphics with Japanese text: survey the screens, redraw.
-6. Casiolator: apply a BPS beside the game at load; warn about a dump whose header
-   checksum is wrong (No-Intro's Little Romance).
+Plan and state in docs/little-romance.md. Working: tools/lr_patch.py builds a 4 MB image
+and a BPS from translations/little-romance (git-ignored): letter-pair font, message boxes
+of 33 letters, balloons drawn horizontally by the game's own code, names. Tested on the
+introduction and the first panel. Next:
+1. Translate the whole script (Claude translates, the user plays and reviews; romaji,
+   no honorifics; balloons in short lines, {swap} where the reading order needs it).
+2. Check the other boxes' widths (answers, captions, menus), the sound effects.
+3. Graphics with Japanese text: survey, redraw.
+4. Casiolator: apply a BPS beside the game at load; warn about a bad header checksum.
 
 ### Translation patches (other games)
 Text encoding and fonts of the Loopy games (Shift-JIS? tiles?), free ROM space, an

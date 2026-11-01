@@ -71,23 +71,50 @@ and the Floopy Drive flash cart is 32 Mbit, so the patch grows the ROM to 4 MB a
 the new font, the English text and any new code in the last megabyte (header end address
 and checksum updated).
 
-## Plan
+## Balloons (found in session 3)
 
-1. Font: a 6-pixel-wide Latin font (letters, digits, punctuation), and glyphs made of two
-   letters each ("dual-tile encoding"): every 12x12 cell shows two 6-pixel letters, so a
-   line holds 32 letters (36 with the line length raised to 18, which the box allows).
-   The text is then encoded as bigram codes chosen among the JIS codes the index leaves
-   unused (about 4600); a script of this size needs about 1000-1500 bigrams. No change
-   to the text engine; the text costs about one byte per letter, as Japanese costs about
-   one byte per kana.
-2. Message boxes: wrap words at the box width in the inserter, write `／` there.
-3. Balloons: a code patch to draw them horizontally (rows top to bottom, centred) instead
-   of columns; English lines must fit the balloon's width (columns x 12 pixels) and
-   height (longest column x 12), and 23 codes. To find: the drawing routine that reads
-   the RAM copy made by 0x0e0124a8.
-4. Names: the six defaults romanised (Masumi, Naoki, Chisato, Motoyuki, Ritsuko, Mikio:
-   readings to check). The player types the heroine's name on the ABC page, in full-width
-   letters, 5 at most.
-5. Graphics: redraw the buttons and labels.
-6. Patch: a BPS file against the good dump, applied by Casiolator when it is beside the
-   game, and usable with any patcher for the flash cart.
+The balloon code can already draw horizontal text. Byte 1 of a balloon's header, bit 0x20:
+set = vertical (every Japanese balloon has it), clear = rows from the top, and the game
+draws a balloon of the right size around them. The chain: 0x0e0124a8 copies the balloon
+to RAM; 0x0e00f07c builds a grid of glyphs (a `／` starts a new column, or a new row);
+0x0e00ee1c sizes it (13 pixels a cell; width and height swap with the mode); 0x0e00eeb8
+draws it (two branches, by the mode) into a buffer that goes to the VDP bitmap.
+Byte 0 is the outline: 0 none, 3 shout, 4 oval with a tail, 7 box, 10 thought, 14 cloud
+and more (22 in use). Bytes 2-3 are the centre, x and y.
+
+The game checks the header checksum: a ROM with a wrong one takes another path.
+
+## The patch (tools/lr_patch.py)
+
+`lr_patch.py ROM translations/little-romance OUT.bin [OUT.bps]` reads the EN lines of
+the script files and builds a 4 MB image:
+
+- Font: a 6-pixel Latin font of our own (tools/lr_font.py); every pair of letters the
+  text uses becomes a 12x12 glyph, given a JIS code the index leaves free (rows 0xb0
+  up). The codes are kept in `pairs.txt` beside the script, which only grows: names in a
+  battery save keep their meaning from build to build. The font (old glyphs, then the
+  pairs) moves to 0x300000; the directory entry at 0x43020 points there.
+- Message boxes: words wrapped at 33 letters (line length raised from 16 to 17 cells,
+  `mov #16,r6` at 0x0e00d630; the box border hides the right half of the 17th cell).
+  `|` new line, `||` new page (3 lines), `{d0d2}` a raw code, `＠□■…` names (counted as 5
+  cells).
+- Strings go after the font; every pointer to the old string is changed.
+- Balloons: horizontal, one row per `|`, 23 codes at most; pitch 13 -> 12 pixels in the
+  balloon code (0x0e00ee1e, ee52, eec6, f004) so pairs join evenly. The centre is moved
+  to keep the balloon on screen; `{at=xx,yy}`, `{shape=nn}` and `{swap}` (the panel's
+  two balloons trade places: English reads left to right) override.
+- Default names: romaji, 4 codes.
+- Header end address and checksum; a BPS patch against the good dump (about 33 KB now).
+
+Tested in Casiolator: the title menu, the introduction, the profile questions and the
+first panel (Masumi) in English.
+
+## Still to do
+
+1. Translate everything (Claude translates, the user plays and reviews).
+2. Choice boxes, captions and menus: check their widths (wrapped like message boxes now).
+3. Sound effects (16 bytes, 8 codes): probably the same balloon code; to try.
+4. Graphics with Japanese text: survey the screens, redraw.
+5. The player types the heroine's name on the ABC page in full-width letters (12 pixels
+   each, 5 at most): fine, but could use the pairs later.
+6. Casiolator: apply a BPS beside the game at load; warn about a bad header checksum.

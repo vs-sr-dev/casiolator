@@ -15,6 +15,7 @@ ROM: the 3 MB cartridge, big-endian or byte-swapped, one file or IC104 + IC105
 
 Notes on the formats are in docs/little-romance.md.
 """
+import io
 import os
 import struct
 import sys
@@ -73,6 +74,38 @@ class Rom:
         return self.d[o:e]
 
 
+def read_script(path):
+    """key -> English of a script file ('[key] ...' then 'JP ...' and 'EN ...' lines)."""
+    en, key = {}, None
+    if os.path.exists(path):
+        for line in open(path, encoding="utf-8"):
+            line = line.rstrip("\n")
+            if line.startswith("["):
+                key = line[1:line.index("]")]
+            elif line.startswith("EN ") and key and line[3:].strip():
+                en[key] = line[3:]
+    return en
+
+
+class Out(io.StringIO):
+    """A script file written on close, keeping the English already in the old one."""
+    def __init__(self, path):
+        super().__init__()
+        self.path = path
+
+    def __exit__(self, *exc):
+        old, key, lines = read_script(self.path), None, []
+        for line in self.getvalue().split("\n"):
+            if line.startswith("["):
+                key = line[1:line.index("]")]
+            elif line == "EN " and key in old:
+                line = "EN " + old[key]
+            lines.append(line)
+        with open(self.path, "w", encoding="utf-8", newline="\n") as f:
+            f.write("\n".join(lines))
+        return super().__exit__(*exc)
+
+
 def show(t):
     out = []
     for k in range(0, len(t), 2):
@@ -117,7 +150,7 @@ def dialogue(rom, refs, out):
             p += 4
         blocks.append((a, sorted(set(run))))
     n = chars = 0
-    with open(out, "w", encoding="utf-8", newline="\n") as f:
+    with Out(out) as f:
         f.write("# Little Romance: text reached through pointers. ／ = new line, ＠ = player's name,\n"
                 "# □■△▲▽▼ = the other names. Message boxes: 3 lines of 16 characters.\n\n")
         for a, ts in sorted(blocks, key=lambda b: b[1][0]):
@@ -136,8 +169,7 @@ def panels(rom, refs, out_b, out_s):
     recs = sorted(t for t in refs if PANELS[0] <= t < PANELS[1] and (t - PANELS[0]) % PANEL_SIZE == 0)
     first = {}
     nb = chars = 0
-    with open(out_b, "w", encoding="utf-8", newline="\n") as fb, \
-            open(out_s, "w", encoding="utf-8", newline="\n") as fs:
+    with Out(out_b) as fb, Out(out_s) as fs:
         fb.write("# Little Romance: speech balloons. Vertical in Japanese: ／ starts a new column\n"
                  "# (right to left); 24 codes at most, the NUL included. 'shape' = balloon\n"
                  "# graphic, flags, x, y; 'grid' = columns x longest column.\n\n")
@@ -165,7 +197,7 @@ def panels(rom, refs, out_b, out_s):
 
 
 def names(rom, out):
-    with open(out, "w", encoding="utf-8", newline="\n") as f:
+    with Out(out) as f:
         f.write("# Little Romance: default names of the characters (□■△▲▽▼), 5 codes each.\n\n")
         for k, sym in enumerate("□■△▲▽▼"):
             o = NAMES + 10 * k

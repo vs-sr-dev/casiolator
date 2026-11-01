@@ -7,3 +7,4 @@ screenshots/
 refs/
 tests/loopy_soundtest/*.elf
 translations/
+__pycache__/
