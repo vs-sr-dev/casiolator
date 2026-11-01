@@ -381,4 +381,5 @@ const core core_pv1000 = {
 	(double)MASTER / FRAME_MC,
 	(double)MASTER / SND_MC,
 	pv_load, pv_reset, pv_run_frame, pv_framebuffer, pv_audio_take, pv_set_pad,
+	NULL,
 };

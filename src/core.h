@@ -26,8 +26,11 @@ typedef struct core
 	/* audio produced so far, up to max samples; returns how many */
 	int (*audio_take)(int16_t *out, int max);
 	void (*set_pad)(int pad, uint32_t buttons);
+	/* the system's BIOS (copied), NULL if it has none; 0 and a message if it is not one */
+	int (*load_bios)(const uint8_t *data, size_t size, char *err, size_t errn);
 } core;
 
 extern const core core_pv1000;
+extern const core core_loopy;
 
 #endif

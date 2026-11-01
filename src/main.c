@@ -24,6 +24,7 @@
 
 static game s_game;
 static const core *s_core;           /* the running system, NULL on the start screen */
+static const char *s_bios_arg;       /* --bios */
 static uint32_t s_script_pad[2];     /* scripted presses (--press) */
 
 /* ---- scripted presses: "T:name[:dur][@pad],..." ---- */
@@ -97,11 +98,23 @@ static int load_game(const char *path, char *err, size_t errn)
 	game g;
 	if (!game_open(path, &g, err, errn))
 		return 0;
-	if (!g.sys)
+	if (g.sys->load_bios && s_bios_arg)
 	{
-		snprintf(err, errn, "%s: Casio Loopy support is still being written", g.title);
-		game_free(&g);
-		return 0;
+		size_t n;
+		uint8_t *b = file_read(s_bios_arg, &n);
+		if (!b)
+		{
+			snprintf(err, errn, "cannot read %s", s_bios_arg);
+			game_free(&g);
+			return 0;
+		}
+		const int ok = g.sys->load_bios(b, n, err, errn);
+		free(b);
+		if (!ok)
+		{
+			game_free(&g);
+			return 0;
+		}
 	}
 	if (!g.sys->load(g.data, g.size, err, errn))
 	{
@@ -688,6 +701,7 @@ int main(int argc, char **argv)
 		else if (!strcmp(a, "--frames") && i + 1 < argc) frames = atol(argv[++i]);
 		else if (!strcmp(a, "--screenshot") && i + 1 < argc) shot = argv[++i];
 		else if (!strcmp(a, "--wav") && i + 1 < argc) wav = argv[++i];
+		else if (!strcmp(a, "--bios") && i + 1 < argc) s_bios_arg = argv[++i];
 		else if (!strcmp(a, "--press") && i + 1 < argc)
 		{
 			if (!press_parse(argv[++i]))

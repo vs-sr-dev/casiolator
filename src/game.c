@@ -119,7 +119,7 @@ static int classify(game *g, uint8_t *data, size_t size, const char *name, char 
 	g->data = data;
 	g->size = size;
 	g->crc = crc32_update(0, data, size);
-	g->sys = g->system == SYS_PV1000 ? &core_pv1000 : NULL;
+	g->sys = g->system == SYS_PV1000 ? &core_pv1000 : &core_loopy;
 	return 1;
 }
 

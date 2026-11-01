@@ -14,7 +14,7 @@ option(CL_SDL "Build the SDL2 frontend (window, sound, input)" ON)
 
 add_executable(casiolator
   src/main.c src/game.c src/zip.c src/config.c src/os.c src/png.c src/font.c
-  src/z80.c src/pv1000.c)
+  src/z80.c src/pv1000.c src/sh1.c src/sh7021.c src/loopy.c src/vdp.c)
 target_compile_definitions(casiolator PRIVATE CL_VERSION="${CL_VERSION}")
 target_compile_options(casiolator PRIVATE -Wall -Wextra -Wno-unused-parameter)
 if(WIN32)
@@ -46,3 +46,4 @@ if(CL_SDL)
 endif()
 
 add_executable(zextest tests/zextest.c src/z80.c)
+add_executable(shdis tools/shdis.c src/sh1.c)
