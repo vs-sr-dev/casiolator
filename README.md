@@ -9,7 +9,7 @@ Status:
 | System | |
 |-|-|
 | PV-1000 | all 13 games play, with sound |
-| Loopy | all 12 cartridges start and respond; no sound yet, no printer, no mouse |
+| Loopy | all 12 cartridges start and respond; no sound yet (in progress), no printer, no mouse |
 
 Casiolator does not come with any game or BIOS: bring your own dumps.
 
