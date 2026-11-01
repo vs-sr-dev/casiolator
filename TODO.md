@@ -17,9 +17,9 @@
 ## Next
 
 ### 1. PV-1000, user testing
-- [ ] User plays the 13 games: speed, sound pitch, controls feel
+- [x] User played (2026-11-01): speed right, sound fine, controller detected at once
+- [x] Two players: pad = P1, keyboard = P2 confirmed by the user
 - [ ] Check against videos of the real console (colours, the border, Dig Dug's stripes)
-- [ ] Two-player games (Select then Start)
 
 ### 2. Casio Loopy core
 Decided (user, 2026-11-01): our own core, clean room, MIT. Do NOT read LoopyMSE's or
