@@ -116,6 +116,15 @@ First survey (session 2):
 ### PV-1000
 - [ ] Compare with videos of the real console (colours, border, Dig Dug's stripes)
 
+### PV-2000 (after the translations; user, 2026-11-01)
+A third system: Z80 (our core), TI TMS9918A video and SN76489 sound (TI's datasheets and
+manuals), built-in keyboard, BIOS with BASIC, cartridges. Memory map, keyboard matrix and
+I/O ports from MAME's pv2000 driver used as documentation, as for the PV-1000 (credited in
+THIRD_PARTY_NOTICES; the strict clean room is for the Loopy only). To check first: the
+dumps (cartridges and BIOS: not in nointro-casio-loopy-pv-1000.zip) and which games need
+keys besides the joystick (a comfortable keyboard mapping). Estimate: one session to
+boot, one to polish (TMS9918A modes, sprites, 4 per line, collisions).
+
 ### Frontend
 - [ ] Controls panel (remapping), as Flick's F4 panel
 - [ ] Toolbar on mouse move, as Flick
